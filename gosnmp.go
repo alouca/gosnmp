@@ -25,8 +25,6 @@ func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*G
 	// Open a UDP connection to the target
 	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", target), time.Duration(timeout)*time.Second)
 
-	fmt.Printf("Type: %t\n", conn)
-
 	if err != nil {
 		return nil, fmt.Errorf("Error establishing connection to host: %s\n", err.Error())
 	}
