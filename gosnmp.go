@@ -245,3 +245,6 @@ func marshalPDU(pdu *snmpPDU) ([]byte, error) {
 
 	return pduBuf.Bytes(), nil
 }
+
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
+// run 'go fmt' before checking in your code!
