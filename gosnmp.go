@@ -23,10 +23,13 @@ type GoSNMP struct {
 
 // NewGoSNMP opens a UDP connection to the target
 func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*GoSNMP, error) {
-	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", target), time.Duration(timeout)*time.Second)
 
+	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", target),
+		time.Duration(timeout)*time.Second)
 	if err != nil {
-		return nil, fmt.Errorf("Error establishing connection to host: %s\n", err.Error())
+		return nil,
+			fmt.Errorf("Error establishing connection to host: %s\n",
+			err.Error())
 	}
 	var s *GoSNMP
 	//if c, ok := conn.(net.UDPConn); ok {
