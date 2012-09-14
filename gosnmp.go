@@ -90,7 +90,7 @@ func (x *GoSNMP) Walk(oid string) ([]*Variable, error) {
 // Sends an SNMP GET request to the target. Returns a Variable with the response or an error
 func (x *GoSNMP) Get(oid string) (vbz *Variable, err error) {
 	defer func() {
-		if e:= recover(); e != nil {
+		if e := recover(); e != nil {
 			err = fmt.Errorf("%v", e)
 		}
 	}()
