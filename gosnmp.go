@@ -31,6 +31,8 @@ func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*G
 			fmt.Errorf("Error establishing connection to host: %s\n",
 			err.Error())
 	}
+	defer conn.Close()
+
 	var s *GoSNMP
 	//if c, ok := conn.(net.UDPConn); ok {
 	s = &GoSNMP{target, community, version, time.Duration(timeout) * time.Second, conn}
