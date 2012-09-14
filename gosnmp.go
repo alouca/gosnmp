@@ -21,8 +21,8 @@ type GoSNMP struct {
 	conn      net.Conn
 }
 
+// NewGoSNMP opens a UDP connection to the target
 func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*GoSNMP, error) {
-	// Open a UDP connection to the target
 	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", target), time.Duration(timeout)*time.Second)
 
 	if err != nil {
