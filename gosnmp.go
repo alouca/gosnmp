@@ -21,15 +21,18 @@ type GoSNMP struct {
 	conn      net.Conn
 }
 
+// NewGoSNMP opens a UDP connection to the target
 func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*GoSNMP, error) {
-	// Open a UDP connection to the target
-	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", target), time.Duration(timeout)*time.Second)
 
-	fmt.Printf("Type: %t\n", conn)
-
+	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", target),
+		time.Duration(timeout)*time.Second)
 	if err != nil {
-		return nil, fmt.Errorf("Error establishing connection to host: %s\n", err.Error())
+		return nil,
+			fmt.Errorf("Error establishing connection to host: %s\n",
+			err.Error())
 	}
+	defer conn.Close()
+
 	var s *GoSNMP
 	//if c, ok := conn.(net.UDPConn); ok {
 	s = &GoSNMP{target, community, version, time.Duration(timeout) * time.Second, conn}
@@ -90,8 +93,12 @@ func (x *GoSNMP) Walk(oid string) ([]*Variable, error) {
 }
 
 // Sends an SNMP GET request to the target. Returns a Variable with the response or an error
-func (x *GoSNMP) Get(oid string) (*Variable, error) {
-	var err error
+func (x *GoSNMP) Get(oid string) (vbz *Variable, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
 
 	// Set timeouts on the connection
 	deadline := time.Now()
@@ -243,3 +250,6 @@ func marshalPDU(pdu *snmpPDU) ([]byte, error) {
 
 	return pduBuf.Bytes(), nil
 }
+
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 noexpandtab
+// run 'go fmt' before checking in your code!
