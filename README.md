@@ -102,6 +102,17 @@ As asn1/asn1.go says (note the last bit about _very complex_):
     ASN.1 is very complex and this package doesn't attempt to implement
     everything by any means.
 
+Submitting Errors
+-----------------
+
+When you get GoSnmp errors due to the BER/DER issue, please email me
+with packet dumps suitable for reading by Wireshark.
+
+The easiest way to do this would be to write an examples/config.txt (see
+examples/config.in) with the oids that are giving problems, tweak/run
+examples/walker.go, then capture in Wireshark using a filter of "udp
+port 161 or udp port 162".
+
 See also
 --------
 
