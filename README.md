@@ -11,7 +11,7 @@ thanks for to him for starting the GoSNMP project. His code is in the
 The code is currently WIP (Work In Progress) - it still has rough edges
 and the API's may change.
 
-Sonia Hamilton, sonia@snowfrog.net.
+Sonia Hamilton, sonia@snowfrog.net, http://www.snowfrog.net.
 
 Install
 -------
