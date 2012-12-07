@@ -1,178 +1,114 @@
-// Copyright 2012 Andreas Louca. All rights reserved.
-// Use of this source code is goverend by a BSD-style
-// license that can be found in the LICENSE file.
+// Copyright 2012 Sonia Hamilton <sonia@snowfrog.net>. All rights
+// reserved.  Use of this source code is governed by a BSD-style license
+// that can be found in the LICENSE file.
 
 package gosnmp
 
 import (
 	"encoding/asn1"
-	"fmt"
+	"log"
 )
-
-type Asn1BER byte
 
 const (
-	Integer          Asn1BER = 0x02
-	BitString                = 0x03
-	OctetString              = 0x04
-	Null                     = 0x05
-	ObjectIdentifier         = 0x06
-	Counter32                = 0x41
-	Gauge32                  = 0x42
-	TimeTicks                = 0x43
-	Opaque                   = 0x44
-	NsapAddress              = 0x45
-	Counter64                = 0x46
-	Uinteger32               = 0x47
-	NoSuchObject             = 0x80
-	NoSuchInstance           = 0x81
+	// `grep define include/net-snmp/library/*.h | grep 0x0123456789`
+	// especially asn1.h
+	TagBoolean         = 0x01 // Class 0 (Universal), Tag 1
+	TagInteger         = 0x02 // Class 0 (Universal), Tag 2
+	TagBitString       = 0x03 // Class 0 (Universal), Tag 3
+	TagOctetString     = 0x04 // Class 0 (Universal), Tag 4
+	TagNull            = 0x05 // Class 0 (Universal), Tag 5
+	TagOID             = 0x06 // Class 0 (Universal), Tag 6
+	TagEnum            = 0x0A // Class 0 (Universal), Tag 10
+	TagUTF8String      = 0x0C // Class 0 (Universal), Tag 12
+	TagSequence        = 0x10 // Class 0 (Universal), Tag 16
+	TagSet             = 0x11 // Class 0 (Universal), Tag 17
+	TagPrintableString = 0x13 // Class 0 (Universal), Tag 19
+	TagT61String       = 0x14 // Class 0 (Universal), Tag 20
+	TagIA5String       = 0x16 // Class 0 (Universal), Tag 22
+	TagUTCTime         = 0x17 // Class 0 (Universal), Tag 23
+	TagGeneralizedTime = 0x18 // Class 0 (Universal), Tag 24
+	TagGeneralString   = 0x1B // Class 0 (Universal), Tag 27
+	TagIPAddress       = 0x40 // Class 1 (Application), Tag 0
+	TagCounter32       = 0x41 // Class 1 (Application), Tag 1
+	TagGauge32         = 0x42 // Class 1 (Application), Tag 2
+	TagTimeTicks       = 0x43 // Class 1 (Application), Tag 3
+	TagOpaque          = 0x44 // Class 1 (Application), Tag 4
+	TagNsapAddress     = 0x45 // Class 1 (Application), Tag 5
+	TagCounter64       = 0x46 // Class 1 (Application), Tag 6
+	TagUinteger32      = 0x47 // Class 1 (Application), Tag 7
+	TagNoSuchObject    = 0x80 // Class 2 (Context Specific), Tag 0
+	TagNoSuchInstance  = 0x81 // Class 2 (Context Specific), Tag 1
 )
 
-// Different packet structure is needed during decode, to trick encoding/asn1 to decode the SNMP packet
+type DecodeResultsI map[Oid]interface{}
 
-type Variable struct {
-	Name  []int
-	Type  Asn1BER
-	Value interface{}
-}
+func DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
+	dr = make(DecodeResultsI)
+	for oid, rv := range ur {
 
-type VarBind struct {
-	Name  asn1.ObjectIdentifier
-	Value asn1.RawValue
-}
+		tag := rv.FullBytes[0]
+		switch tag {
 
-type PDU struct {
-	RequestId   int32
-	ErrorStatus int
-	ErrorIndex  int
-	VarBindList []VarBind
-}
-type PDUResponse struct {
-	RequestId   int32
-	ErrorStatus int
-	ErrorIndex  int
-	VarBindList []*Variable
-}
-
-type Message struct {
-	Version   int
-	Community []uint8
-	Data      asn1.RawValue
-}
-
-func decode(data []byte) (*PDUResponse, error) {
-	m := Message{}
-	_, err := asn1.Unmarshal(data, &m)
-	if err != nil {
-		return nil, err
-	}
-	choice := m.Data.FullBytes[0]
-	switch choice {
-	// SNMP Response
-	case 0xa0, 0xa1, 0xa2:
-
-		pdu := new(PDU)
-
-		// hack ANY -> IMPLICIT SEQUENCE
-		m.Data.FullBytes[0] = 0x30
-		_, err = asn1.Unmarshal(m.Data.FullBytes, pdu)
-		if err != nil {
-			return nil, fmt.Errorf("Error decoding pdu: %#v, %#v, %s", m.Data.FullBytes, pdu, err)
-		}
-
-		// make response pdu
-		resp := new(PDUResponse)
-		// Copy values from parsed pdu
-		resp.RequestId = pdu.RequestId
-		resp.ErrorIndex = pdu.ErrorIndex
-		resp.ErrorStatus = pdu.ErrorStatus
-
-		resp.VarBindList = make([]*Variable, len(pdu.VarBindList))
-
-		// Decode all vars
-		for c, v := range pdu.VarBindList {
-
-			val, err := decodeValue(v.Value.FullBytes)
-			if err != nil {
-				return nil, err
-			} else {
-				val.Name = v.Name
-				resp.VarBindList[c] = val
+		// 0x01
+		case TagBoolean:
+			val := false // a "empty" bool
+			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
+				dr[oid] = val
 			}
+			log.Printf("BOOLEAN: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+
+		// 0x02 , 0x41 , 0x42 , 0x43
+		case TagInteger, TagCounter32, TagGauge32, TagTimeTicks:
+			val := int64(0) // an "empty" integer
+			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
+				dr[oid] = val
+			}
+			log.Printf("INTEGER: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+
+		// 0x04
+		case TagOctetString:
+			val := string(rv.Bytes)
+			log.Printf("STRING: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			dr[oid] = val
+
+		// 0x06
+		case TagOID:
+			val, _ := NewObjectIdentifier("0.0") // an "empty" OID
+			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
+				dr[oid] = OidAsString(val)
+			}
+			log.Printf("OID: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+
+		// 0x40
+		case TagIPAddress:
+			// TODO copy asn1/* into gosnmp/asn1/*, or just manually decode this field?
+			dr[oid] = "gosnmp: TODO: unmarshal 0x40 ipaddress"
+
+		// 0x05, 0x80, 0x81
+		case TagNull, TagNoSuchObject, TagNoSuchInstance:
+			dr[oid] = nil
+
+		default:
+			// TODO cause an exit: want to *notice* unhandled tags
+			log.Fatalf("gonsmp: tag |%x| not decoded", tag)
 		}
 
-		return resp, nil
-	default:
-		return nil, fmt.Errorf("Unable to decode type: %#v\n", choice)
 	}
-	return nil, fmt.Errorf("Unknown CHOICE: %x", choice)
-}
-
-func decodeValue(data []byte) (retVal *Variable, err error) {
-	retVal = new(Variable)
-
-	switch Asn1BER(data[0]) {
-
-	// Integer
-	case Integer:
-		ret, err := parseInt(data[2:])
-		if err != nil {
-			break
-		}
-		retVal.Type = Integer
-		retVal.Value = ret
-	// Octet
-	case OctetString:
-		retVal.Type = OctetString
-		retVal.Value = string(data[2:])
-	// Counter32
-	case Counter32:
-		ret, err := parseInt(data[2:])
-		if err != nil {
-			break
-		}
-		retVal.Type = Counter32
-		retVal.Value = ret
-	case TimeTicks:
-		ret, err := parseInt(data[2:])
-		if err != nil {
-			break
-		}
-		retVal.Type = TimeTicks
-		retVal.Value = ret
-	// Gauge32
-	case Gauge32:
-		ret, err := parseInt(data[2:])
-		if err != nil {
-			break
-		}
-		retVal.Type = Gauge32
-		retVal.Value = ret
-	case Counter64:
-		ret, err := parseInt64(data[2:])
-
-		// Decode it
-		if err != nil {
-			break
-		}
-
-		retVal.Type = Counter64
-		retVal.Value = ret
-	case NoSuchInstance:
-		return nil, fmt.Errorf("No such instance")
-	case NoSuchObject:
-		return nil, fmt.Errorf("No such object")
-	default:
-		err = fmt.Errorf("Unable to decode %x - not implemented", data[0])
-	}
-
 	return
 }
 
-// Parses UINT16
-func ParseUint16(content []byte) int {
-	number := uint8(content[1]) | uint8(content[0])<<8
-	//fmt.Printf("\t%d\n", number)
+// TODO
+type DecodeResultsS map[Oid]string
 
-	return int(number)
+func DecodeS(ur UnmarshalResults) (dr DecodeResultsS) {
+	// just do %v on all fields??
+	return
+}
+
+// TODO
+type DecodeResultsN map[Oid]int64
+
+func DecodeN(ur UnmarshalResults) (dr DecodeResultsN) {
+	// return 0 for string, etc fields
+	return
 }

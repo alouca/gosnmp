@@ -23,18 +23,10 @@ const (
 type SnmpVersion uint8
 
 const (
-	Version1  SnmpVersion = 0x0
-	Version2c SnmpVersion = 0x1
+	Version1       SnmpVersion = 0x0
+	Version2c      SnmpVersion = 0x1
+	VersionUnknown SnmpVersion = 0xf
 )
-
-func (s SnmpVersion) String() string {
-	if s == Version1 {
-		return "1"
-	} else if s == Version2c {
-		return "2c"
-	}
-	return "U"
-}
 
 type SnmpPacket struct {
 	Version     SnmpVersion
@@ -50,6 +42,26 @@ type SnmpPDU struct {
 	Name  string
 	Type  Asn1BER
 	Value interface{}
+}
+
+// implement Stringer interface for SnmpVersion
+func (s SnmpVersion) String() string {
+	if s == Version1 {
+		return "1"
+	} else if s == Version2c {
+		return "2c"
+	}
+	return "U"
+}
+
+// NewSnmpVersion takes a version string an returns a new SnmpVersion
+func NewSnmpVersion(version string) (SnmpVersion, error) {
+	if version == "1" {
+		return Version1, nil
+	} else if version == "2c" {
+		return Version2c, nil
+	}
+	return VersionUnknown, fmt.Errorf("Unknown version %s", version)
 }
 
 func Unmarshal(packet []byte) (*SnmpPacket, error) {
@@ -238,10 +250,12 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 	buffer := make([]byte, 0, 1024)
 	buf := bytes.NewBuffer(buffer)
 
-	// Write the packet header (Message type 0x30) & Version = 2
+	// Write the packet header
+	// Sequence, Length (0), Type (2 = int), Length (1), Version
 	buf.Write([]byte{byte(Sequence), 0, 2, 1, byte(packet.Version)})
 
 	// Write Community
+	// Type (4), Length, Community
 	buf.Write([]byte{4, uint8(len(packet.Community))})
 	buf.WriteString(packet.Community)
 
@@ -249,6 +263,8 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 	snmpPduBuffer := make([]byte, 0, 1024)
 	snmpPduBuf := bytes.NewBuffer(snmpPduBuffer)
 
+	// Request, Length (0), RequestID (2,1,RID), Error (2,1,Err), ErrIdx (2,1,EDX)
+	// VarbindList (Sequence,Length (0))
 	snmpPduBuf.Write([]byte{byte(packet.RequestType), 0, 2, 1, packet.RequestID, 2, 1, packet.Error, 2, 1, packet.ErrorIndex, byte(Sequence), 0})
 
 	pduLength := 0
@@ -270,7 +286,7 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 
 	buf.Write(pduBytes)
 
-	// Write the 
+	// Write the
 	//buf.Write([]byte{packet.RequestType, uint8(17 + len(mOid)), 2, 1, 1, 2, 1, 0, 2, 1, 0, 0x30, uint8(6 + len(mOid)), 0x30, uint8(4 + len(mOid)), 6, uint8(len(mOid))})
 	//buf.Write(mOid)
 	//buf.Write([]byte{5, 0})
