@@ -6,7 +6,6 @@ package gosnmp
 
 import (
 	"encoding/asn1"
-	"log"
 )
 
 const (
@@ -42,7 +41,7 @@ const (
 
 type DecodeResultsI map[Oid]interface{}
 
-func DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
+func (s GoSnmp) DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 	dr = make(DecodeResultsI)
 	for oid, rv := range ur {
 
@@ -55,7 +54,7 @@ func DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
 				dr[oid] = val
 			}
-			log.Printf("BOOLEAN: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			s.Logger.Printf("BOOLEAN: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
 
 		// 0x02 , 0x41 , 0x42 , 0x43
 		case TagInteger, TagCounter32, TagGauge32, TagTimeTicks:
@@ -63,12 +62,12 @@ func DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
 				dr[oid] = val
 			}
-			log.Printf("INTEGER: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			s.Logger.Printf("INTEGER: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
 
 		// 0x04
 		case TagOctetString:
 			val := string(rv.Bytes)
-			log.Printf("STRING: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			s.Logger.Printf("STRING: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
 			dr[oid] = val
 
 		// 0x06
@@ -77,7 +76,7 @@ func DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
 				dr[oid] = OidAsString(val)
 			}
-			log.Printf("OID: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			s.Logger.Printf("OID: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
 
 		// 0x40
 		case TagIPAddress:
@@ -90,7 +89,7 @@ func DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 
 		default:
 			// TODO cause an exit: want to *notice* unhandled tags
-			log.Fatalf("gonsmp: tag |%x| not decoded", tag)
+			s.Logger.Fatalf("gonsmp: tag |%x| not decoded", tag)
 		}
 
 	}
@@ -100,7 +99,7 @@ func DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 // TODO
 type DecodeResultsS map[Oid]string
 
-func DecodeS(ur UnmarshalResults) (dr DecodeResultsS) {
+func (s GoSnmp) DecodeS(ur UnmarshalResults) (dr DecodeResultsS) {
 	// just do %v on all fields??
 	return
 }
@@ -108,7 +107,7 @@ func DecodeS(ur UnmarshalResults) (dr DecodeResultsS) {
 // TODO
 type DecodeResultsN map[Oid]int64
 
-func DecodeN(ur UnmarshalResults) (dr DecodeResultsN) {
+func (s GoSnmp) DecodeN(ur UnmarshalResults) (dr DecodeResultsN) {
 	// return 0 for string, etc fields
 	return
 }

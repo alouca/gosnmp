@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"os"
 	"os/exec"
 	"regexp"
 	"runtime/debug"
@@ -40,6 +41,7 @@ var (
 	// an oid (leading .) followed by whitespace then a value
 	oid_val_rx = regexp.MustCompile(`^((?:\.\d+)+)\s+(.*)$`)
 	err        error
+	s          *gosnmp.GoSnmp
 )
 
 // implement Stringer interface for oids_t
@@ -143,7 +145,8 @@ func extract(line string) (match bool, oid string, value string) {
 }
 
 func (c Conf) print_single_varbind(oids results_t) {
-	s := gosnmp.GoSnmp{c.management_ip, c.community, c.version, 5 * time.Second}
+	s = gosnmp.DefaultGoSnmp(c.management_ip)
+	s.Logger = log.New(os.Stderr, "", log.LstdFlags)
 
 	for oid, _ := range oids {
 		log.Printf("oid: %s\n", oid)
@@ -152,7 +155,9 @@ func (c Conf) print_single_varbind(oids results_t) {
 }
 
 func (c Conf) print_random_varbind(oids results_t) {
-	s := gosnmp.GoSnmp{c.management_ip, c.community, c.version, 60 * time.Second}
+	s = gosnmp.DefaultGoSnmp(c.management_ip)
+	s.Logger = log.New(os.Stderr, "", log.LstdFlags)
+	s.Timeout = 60 * time.Second
 
 	r := rand.New(rand.NewSource(42))
 	random_count := r.Intn(10) + 1
@@ -183,7 +188,7 @@ func process(ur gosnmp.UnmarshalResults, an_error error) {
 			die(an_error)
 		}
 	} else {
-		dr := gosnmp.DecodeI(ur)
+		dr := s.DecodeI(ur)
 		for oid, rv := range ur {
 			log.Printf("oid|decode: %s|%#v\n", oid, dr[oid])
 			log.Printf("raw_value: %#v\n\n", rv)

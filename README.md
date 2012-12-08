@@ -33,12 +33,12 @@ Usage
 See examples/walker.go for a more detailed example of usage. In this snippet,
 **".1.2.3"**, **".4.5.6"** represent correct oids.
 
-	s := gosnmp.GoSnmp{
-        Target: "192.168.1.10",
-        Community: "public",
-        Version: gosnmp.NewSnmpVersion("2c"),
-        Timeout: 5 * time.Second,
-    }
+    // defaults: public, 2c, 5s timeout, discard logging
+    s := DefaultGoSNMP("192.168.1.10")                // target ip address/hostname
+
+    // change some default values
+    s.Logger = log.New(os.Stderr, "", log.LstdFlags)  // log GoSnmp internals
+    s.Timeout = 60 * time.Second                      // target is slow
 
     raw_results := s.Get(".1.2.3")                    // s.Get() takes one
     // raw_results := s.Get(".1.2.3", ".4.5.6")       // or more
@@ -64,18 +64,18 @@ One decoder **DecodeI()** is currently implemented - it decodes to values
 that implement Interface{}:
 
     type DecodeResultsI map[Oid]interface{}
-    func DecodeI(ur UnmarshalResults) (dr DecodeResultsI) { ... }
+    func (s GoSnmp) DecodeI(ur UnmarshalResults) (dr DecodeResultsI) { ... }
 
 I have also defined (but not implemented) two other decoders:
 
     // I just want to see string values, like from:
     // snmpget -Oq -On -c public -v 1 192.168.1.10 .1.2.3
     type DecodeResultsS map[Oid]string
-    func DecodeS(ur UnmarshalResults) (dr DecodeResultsS) { ... }
+    func (s GoSnmp) DecodeS(ur UnmarshalResults) (dr DecodeResultsS) { ... }
 
     // I just want int64's back - return 0 for non-numeric values
     type DecodeResultsN map[Oid]int64
-    func DecodeN(ur UnmarshalResults) (dr DecodeResultsN) { ... }
+    func (s GoSnmp) DecodeN(ur UnmarshalResults) (dr DecodeResultsN) { ... }
 
 BER vs DER
 ----------

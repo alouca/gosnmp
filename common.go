@@ -11,14 +11,6 @@ import (
 	"strings"
 )
 
-type SnmpVersion int
-
-const (
-	Version1       SnmpVersion = 0x0
-	Version2c      SnmpVersion = 0x1
-	VersionUnknown SnmpVersion = 0xf
-)
-
 var (
 	err error
 )
@@ -26,6 +18,14 @@ var (
 //
 // SnmpVersion functions
 //
+
+type SnmpVersion int
+
+const (
+	Version1       SnmpVersion = 0x0
+	Version2c      SnmpVersion = 0x1
+	VersionUnknown SnmpVersion = 0xf
+)
 
 // implement Stringer interface for SnmpVersion
 func (s SnmpVersion) String() string {
