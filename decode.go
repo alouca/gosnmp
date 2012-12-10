@@ -6,6 +6,8 @@ package gosnmp
 
 import (
 	"encoding/asn1"
+	"fmt"
+	"strconv"
 )
 
 const (
@@ -51,41 +53,67 @@ func (s GoSnmp) DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 		// 0x01
 		case TagBoolean:
 			val := false // a "empty" bool
-			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
-				dr[oid] = val
+			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
+				s.Logger.Printf("BOOLEAN: err: %v", err)
 			}
+			dr[oid] = val
 			s.Logger.Printf("BOOLEAN: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
 
-		// 0x02 , 0x41 , 0x42 , 0x43
+		// 0x02, 0x41, 0x42, 0x43
 		case TagInteger, TagCounter32, TagGauge32, TagTimeTicks:
 			val := int64(0) // an "empty" integer
-			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
-				dr[oid] = val
+			// nasty hack: set Tag to Integer, so asn1 doesn't barf with
+			// "ASN.1 structure error: tags don't match". Unfortunately,
+			// asn1.parseFieldParameters (via UnmarshalWithParams) doesn't
+			// allow setting "class:classContextSpecific,tag:1" ie 0x41, nor
+			// probably (TODO) would the Unmarshalling handle
+			// classContextSpecific
+			rv.FullBytes[0] = TagInteger
+			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
+				s.Logger.Printf("INTEGER: err: %v", err)
 			}
 			s.Logger.Printf("INTEGER: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			dr[oid] = val
 
 		// 0x04
 		case TagOctetString:
-			val := string(rv.Bytes)
-			s.Logger.Printf("STRING: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
-			dr[oid] = val
+			if len(rv.FullBytes) > 2 && rv.FullBytes[2] == 0x00 {
+				// I don't know what these strings that start with 00 are, but
+				// doing a hex dump gives the same result as netsnmp
+				s.Logger.Printf("STRINGO: 00 string")
+				val := fmt.Sprintf("% X", rv.FullBytes[2:]) + " "
+				dr[oid] = val
+			} else {
+				val := []uint8{}
+				if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
+					s.Logger.Printf("STRINGO: err: %v", err)
+				}
+				s.Logger.Printf("STRINGO: fullbytes: % X, tag: %d, decode: %s", rv.FullBytes, tag, val)
+				dr[oid] = string(val)
+			}
 
 		// 0x06
 		case TagOID:
 			val, _ := NewObjectIdentifier("0.0") // an "empty" OID
-			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err == nil {
-				dr[oid] = OidAsString(val)
+			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
+				s.Logger.Printf("OID: err: %v", err)
 			}
+			dr[oid] = OidAsString(val)
 			s.Logger.Printf("OID: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
 
 		// 0x40
 		case TagIPAddress:
-			// TODO copy asn1/* into gosnmp/asn1/*, or just manually decode this field?
-			dr[oid] = "gosnmp: TODO: unmarshal 0x40 ipaddress"
+			var val string
+			for _, octet := range rv.Bytes {
+				val = val + "." + fmt.Sprintf("%v", octet)
+			}
+			val = val[1:]
+			s.Logger.Printf("IPADDRESS: fullbytes: % X, tag: %d, decode: %s", rv.FullBytes, tag, val)
+			dr[oid] = val
 
 		// 0x05, 0x80, 0x81
 		case TagNull, TagNoSuchObject, TagNoSuchInstance:
-			dr[oid] = nil
+			dr[oid] = ""
 
 		default:
 			// TODO cause an exit: want to *notice* unhandled tags
@@ -96,18 +124,37 @@ func (s GoSnmp) DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 	return
 }
 
-// TODO
 type DecodeResultsS map[Oid]string
 
-func (s GoSnmp) DecodeS(ur UnmarshalResults) (dr DecodeResultsS) {
-	// just do %v on all fields??
+// DecodeS decodes UnmarshalResults, and returns all results as strings
+//
+// This is a convenience function - it just returns the result of %v
+// on all values from DecodeI()
+func (s GoSnmp) DecodeS(ur UnmarshalResults) (dr_s DecodeResultsS) {
+	dr_i := s.DecodeI(ur)
+	dr_s = make(DecodeResultsS)
+	for key, val := range dr_i {
+		dr_s[key] = fmt.Sprintf("%v", val)
+	}
 	return
 }
 
-// TODO
 type DecodeResultsN map[Oid]int64
 
-func (s GoSnmp) DecodeN(ur UnmarshalResults) (dr DecodeResultsN) {
-	// return 0 for string, etc fields
+// DecodeN decodes UnmarshalResults, and returns all results as int64s
+//
+// This is a convenience function - it just returns the result of %v
+// on all values from DecodeI(), converted to int64's
+func (s GoSnmp) DecodeN(ur UnmarshalResults) (dr_n DecodeResultsN) {
+	dr_i := s.DecodeI(ur)
+	dr_n = make(DecodeResultsN)
+	for key, val := range dr_i {
+		val_s := fmt.Sprintf("%v", val)
+		if val_n, err := strconv.ParseInt(val_s, 10, 64); err == nil {
+			dr_n[key] = val_n
+		} else {
+			dr_n[key] = 0
+		}
+	}
 	return
 }

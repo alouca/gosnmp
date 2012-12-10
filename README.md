@@ -30,8 +30,8 @@ BSD license.
 Usage
 -----
 
-See examples/walker.go for a more detailed example of usage. In this snippet,
-**".1.2.3"**, **".4.5.6"** represent correct oids.
+See **examples/walker.go** for a more detailed example of usage. In this snippet,
+**".1.2.3"**, **".4.5.6"** represent valid oids.
 
     // defaults: public, 2c, 5s timeout, discard logging
     s := DefaultGoSNMP("192.168.1.10")                // target ip address/hostname

@@ -3,7 +3,9 @@ package main
 // walker.go uses netsnmp and gosnmp to query a device
 // for values, then compares the results
 //
-// scratch code: not resilient, could be tightened
+// use it as a way of testing gosnmp, as well as example code of how to
+// use gosnmp. I've haven't use command line options, rather you can
+// just un/comment sections of code to tweak behaviour.
 
 import (
 	"bytes"
@@ -15,6 +17,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,12 +55,23 @@ func (o oids_t) String() string {
 func main() {
 	conf := conf_load()
 	oids_netsnmp := conf.netsnmp()
+
+	// uncomment to see oids/values returned by netsnmp
 	// for oid, value := range oids_netsnmp {
 	// 	log.Printf("%s %s", oid, value)
 	// }
-	// conf.print_single_varbind(oids_netsnmp)
-	// log.Prinln("======================================")
-	conf.print_random_varbind(oids_netsnmp)
+
+	// uncomment to see oids/values returned by gosnmp, when using single
+	// oid varbinds
+	// conf.get_single_varbinds(oids_netsnmp)
+	// log.Println("======================================")
+
+	// uncomment to see oids/values returned by gosnmp, when using random
+	// length oid varbinds
+	// conf.get_random_varbinds(oids_netsnmp)
+	// log.Println("======================================")
+
+	conf.compare_single_varbinds(oids_netsnmp)
 }
 
 // load configuration from config_path
@@ -77,6 +91,7 @@ func conf_load() (conf Conf) {
 		splits := strings.Split(line, ":")
 		key := strings.TrimSpace(splits[0])
 		val := strings.TrimSpace(splits[1])
+		// uncomment to see each key/val loaded from conf file
 		// log.Printf("|key|val| |%s|%s|\n\n", key, val)
 
 		if key == "management_ip" {
@@ -115,6 +130,7 @@ func (c Conf) netsnmp() (result results_t) {
 		cmd_str = fmt.Sprintf("\"\"/usr/bin/snmpget -Oq -On -c %s -v %s %s %s\"\"",
 			c.community, c.version, c.management_ip, c.oids)
 	}
+	// uncomment to see command string passed to netsnmp
 	// log.Printf("%s\n\n", cmd_str)
 	cmd := exec.Command("/bin/sh", "-c", cmd_str)
 	cmd.Stdout = &outb
@@ -126,6 +142,7 @@ func (c Conf) netsnmp() (result results_t) {
 
 	for _, line := range strings.Split(outb.String(), "\n") {
 		if match, oid, value := extract(line); match {
+			// uncomment to see oids and values extracted from netsnmp results
 			// log.Printf("|oid|value| |%s|%s|\n", oid, value)
 			result[oid] = value
 		}
@@ -144,23 +161,25 @@ func extract(line string) (match bool, oid string, value string) {
 	return
 }
 
-func (c Conf) print_single_varbind(oids results_t) {
+func (c Conf) get_single_varbinds(oids results_t) {
 	s = gosnmp.DefaultGoSnmp(c.management_ip)
+	s.Timeout = 15 * time.Second
 	s.Logger = log.New(os.Stderr, "", log.LstdFlags)
 
 	for oid, _ := range oids {
 		log.Printf("oid: %s\n", oid)
-		process(s.Get(oid))
+		print_varbinds(s.Get(oid))
 	}
 }
 
-func (c Conf) print_random_varbind(oids results_t) {
+func (c Conf) get_random_varbinds(oids results_t) {
 	s = gosnmp.DefaultGoSnmp(c.management_ip)
 	s.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	s.Timeout = 60 * time.Second
 
-	r := rand.New(rand.NewSource(42))
-	random_count := r.Intn(10) + 1
+	r := rand.New(rand.NewSource(42)) // 42 arbitrary seed
+	const MAX_OIDS_SENT = 10
+	random_count := r.Intn(MAX_OIDS_SENT) + 1
 	var count int
 	var oidss []string
 
@@ -170,16 +189,16 @@ func (c Conf) print_random_varbind(oids results_t) {
 		if count == random_count {
 			log.Println("--------------------------------------------")
 			log.Printf("oidss(%d):\n%s", count, strings.Join(oidss, "\n"))
-			process(s.Get(oidss...))
+			print_varbinds(s.Get(oidss...))
 
-			oidss = nil
+			oidss = nil // "truncate" oidss
 			count = 0
-			random_count = r.Intn(10) + 1
+			random_count = r.Intn(MAX_OIDS_SENT) + 1
 		}
 	}
 }
 
-func process(ur gosnmp.UnmarshalResults, an_error error) {
+func print_varbinds(ur gosnmp.UnmarshalResults, an_error error) {
 	if an_error != nil {
 		// TODO categorise errors in gosnmp
 		if strings.Contains(fmt.Sprintf("%s", an_error), "invalid oid") {
@@ -192,6 +211,32 @@ func process(ur gosnmp.UnmarshalResults, an_error error) {
 		for oid, rv := range ur {
 			log.Printf("oid|decode: %s|%#v\n", oid, dr[oid])
 			log.Printf("raw_value: %#v\n\n", rv)
+		}
+	}
+}
+
+func (c Conf) compare_single_varbinds(oids results_t) {
+	s = gosnmp.DefaultGoSnmp(c.management_ip)
+	s.Timeout = 15 * time.Second
+	s.Logger = log.New(os.Stderr, "", log.LstdFlags)
+
+	for oid, _ := range oids {
+		net_val := oids[oid]
+
+		ur, err := s.Get(oid)
+		var go_val string
+		if err != nil {
+			go_val = fmt.Sprintf("%v", err)
+		}
+		// TODO should use DecodeI here, compare strings to strings
+		// and numbers to numbers
+		// uncomment to compare DecodeS results
+		//go_val = s.DecodeS(ur)[gosnmp.Oid(oid)]
+		go_val = strconv.FormatInt(s.DecodeN(ur)[gosnmp.Oid(oid)], 10)
+
+		if net_val != go_val {
+			log.Printf("oid: %s\n", oid)
+			log.Printf("%60s|N G|%-20s\n\n", net_val, go_val)
 		}
 	}
 }

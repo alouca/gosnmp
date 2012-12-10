@@ -75,17 +75,25 @@ func Unmarshal(msg []byte) (ur UnmarshalResults, err error) {
 	}
 
 	// TODO check the error field results. Page 6 of Infrax doc
-	// err index - varbind that caused error
+	// really need an array of structs, where:
+	// * array index = varbind index
+	// * array value = struct:
+	//   * Error
+	//   * asn1.RawValue
+	// But, PDU seems to have only 1 field (Error Index), and there could
+	// be multiple fields...
 	/*
-		const (
-			errNoError = 0
-			errTooBig = 1
-			errNoSuchName = 2
-			errBadValue = 3
-			errReadOnly = 4
-			errGenErr = 5
-			... thru to 18
-		)
+		err index - varbind that caused error
+			const (
+				errNoError = 0
+				errTooBig = 1
+				errNoSuchName = 2
+				errBadValue = 3
+				errReadOnly = 4
+				errGenErr = 5
+				... thru to 18
+			)
+			"No Such Instance currently exists at this OID"
 	*/
 
 	for _, v := range m.Pdu.Varbinds {
