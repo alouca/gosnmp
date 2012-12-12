@@ -287,6 +287,11 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 			}
 		}
 
+		if strings.Index(go_val, "gosnmp: invalid oid") >= 0 {
+			// skip for the moment
+			continue
+		}
+
 		var tag reflect.Type
 		if fr != nil {
 			tag = reflect.TypeOf(fr.Value)
