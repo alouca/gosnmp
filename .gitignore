@@ -26,7 +26,3 @@ _testmain.go
 
 # Mac OS X crap
 .DS_Store
-
-# Sonia - scratch
-bpl-poller
-pkg
