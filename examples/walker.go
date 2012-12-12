@@ -15,6 +15,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"reflect"
 	"regexp"
 	"runtime/debug"
 	"strconv"
@@ -286,22 +287,41 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 			}
 		}
 
-		log.Printf("oid|decode: %s|%#v\n", oid, fr)
+		var tag reflect.Type
+		if fr != nil {
+			tag = reflect.TypeOf(fr.Value)
 
-		var comp string
-		if net_val == go_val {
-			comp = ">> SAME STRING  <<"
-		} else {
-			comp = ">> DIFF STRING  <<"
-		}
-		log.Printf("%s %60s|N G|%-20s\n", comp, net_val, go_val)
+			nsi := reflect.TypeOf(*new(gosnmp.TagResultNoSuchInstance))
+			if tag == nsi {
+				continue
+			}
 
-		if net_val_n == go_val_n {
-			comp = ">> SAME INTEGER <<"
-		} else {
-			comp = ">> DIFF INTEGER <<"
+			c32 := reflect.TypeOf(*new(gosnmp.TagResultCounter32))
+			if tag == c32 && within_percent(net_val_n, go_val_n, 1) {
+				continue
+			}
+
+			tt := reflect.TypeOf(*new(gosnmp.TagResultTimeTicks))
+			if tag == tt {
+				// know tt repr is good
+				continue
+			}
 		}
-		log.Printf("%s %60d|N G|%-20d\n\n", comp, net_val_n, go_val_n)
+
+		if net_val != go_val || net_val_n != go_val_n {
+			log.Printf("oid|decode|tag: %s|%#v|%v\n", oid, fr, tag)
+			var comp string
+			if net_val != go_val {
+				comp = ">> DIFF STRING  <<"
+				log.Printf("%s %60s|N G|%-20s\n", comp, net_val, go_val)
+			}
+
+			if net_val_n != go_val_n {
+				comp = ">> DIFF INTEGER <<"
+				log.Printf("%s %60d|N G|%-20d\n", comp, net_val_n, go_val_n)
+			}
+			log.Printf("\n\n") // separator
+		}
 
 	}
 }
@@ -394,6 +414,26 @@ func chunk(current_position, chunk_size, slice_length int) bool {
 		return true
 	}
 	if current_position == slice_length-1 {
+		return true
+	}
+	return false
+}
+
+// returns true if v1 and v2 are within percent of each other
+//
+// handles zeros in v1, v2 or both
+func within_percent(v1, v2, percent int64) (result bool) {
+	if v1 == 0 && v2 == 0 {
+		return true
+	}
+	if v1 == 0 || v2 == 0 {
+		return false
+	}
+	percentf := float64(percent) / float64(100)
+	if v1 > v2 {
+		v1, v2 = v2, v1
+	}
+	if (1 - (float64(v1) / float64(v2))) < percentf {
 		return true
 	}
 	return false
