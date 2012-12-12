@@ -54,11 +54,22 @@ func (r TagResultBoolean) Integer() int64 {
 	return 0
 }
 
+func (r TagResultBoolean) String() string {
+	if r {
+		return "true"
+	}
+	return "false"
+}
+
 // TagOctetString
 type TagResultOctetString string
 
 func (r TagResultOctetString) Integer() int64 {
 	return 0
+}
+
+func (r TagResultOctetString) String() string {
+	return fmt.Sprintf("%s", string(r))
 }
 
 // TagOID
@@ -79,6 +90,10 @@ type TagResultIPAddress string
 
 func (r TagResultIPAddress) Integer() int64 {
 	return -1
+}
+
+func (r TagResultIPAddress) String() string {
+	return fmt.Sprintf("%s", string(r))
 }
 
 //
@@ -189,6 +204,7 @@ type FullResult struct {
 
 type Taggish interface {
 	Integer() int64
+	fmt.Stringer
 }
 
 type FullDecodeResults map[Oid]*FullResult

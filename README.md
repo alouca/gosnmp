@@ -77,6 +77,7 @@ suitable for testing/debugging:
 
     type Taggish interface {
         Integer() int64
+        fmt.Stringer
     }
 
     type FullDecodeResults map[Oid]*FullResult
@@ -94,8 +95,8 @@ suitable for testing/debugging:
 
         full_result := fd[oid]
 
-        // interface type, eg TagResultOctetString, TagResultCounter32
-        fmt.Println("interface type:", reflect.TypeOf(full_result))
+        // tag type, eg TagResultOctetString, TagResultCounter32
+        fmt.Println("interface type:", reflect.TypeOf(full_result.Value))
 
         // I just want my result as a string
         fmt.Printf("string decode: %s", full_result.Value)

@@ -271,7 +271,7 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 		var fr *gosnmp.FullResult
 		net_val := oids[oid]
 		net_val_n, _ := strconv.ParseInt(net_val, 10, 64)
-		var go_val_n = int64(0)
+		go_val_n := int64(0)
 
 		var go_val string
 		ur, err := s.Get(oid)
@@ -281,7 +281,7 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 			fd := s.FullDecode(ur)
 			fr = fd[gosnmp.Oid(oid)]
 			if fr != nil {
-				go_val = fmt.Sprintf("%s", fr.Value)
+				go_val = fr.Value.String()
 				go_val_n = fr.Value.Integer()
 			}
 		}
