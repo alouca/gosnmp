@@ -7,7 +7,6 @@ package gosnmp
 import (
 	"encoding/asn1"
 	"fmt"
-	"strconv"
 )
 
 const (
@@ -41,27 +40,194 @@ const (
 	TagNoSuchInstance  = 0x81 // Class 2 (Context Specific), Tag 1
 )
 
-type DecodeResultsI map[Oid]interface{}
+//
+// Types for each Tag
+//
 
-func (s GoSnmp) DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
-	dr = make(DecodeResultsI)
+// TagBoolean
+type TagResultBoolean bool
+
+func (r TagResultBoolean) Integer() int64 {
+	if r {
+		return 1
+	}
+	return 0
+}
+
+// TagOctetString
+type TagResultOctetString string
+
+func (r TagResultOctetString) Integer() int64 {
+	return 0
+}
+
+// TagOID
+type TagResultOID struct{}
+
+func (r TagResultOID) String() string {
+	return "TODO - OID"
+}
+
+func (r TagResultOID) Integer() int64 {
+	return -1
+}
+
+// TagIPAddress
+// TODO ip address really should be stored as an int,
+// then String() should convert to dotted form
+type TagResultIPAddress string
+
+func (r TagResultIPAddress) Integer() int64 {
+	return -1
+}
+
+//
+// the "Integers"
+//
+
+// TagInteger
+type TagResultInteger int64
+
+func (r TagResultInteger) Integer() int64 {
+	return int64(r)
+}
+
+func (r TagResultInteger) String() string {
+	return fmt.Sprintf("%d", r)
+}
+
+// TagCounter32
+type TagResultCounter32 int64
+
+func (r TagResultCounter32) Integer() int64 {
+	return int64(r)
+}
+
+func (r TagResultCounter32) String() string {
+	return fmt.Sprintf("%d", r)
+}
+
+// TagGauge32
+type TagResultGauge32 int64
+
+func (r TagResultGauge32) Integer() int64 {
+	return int64(r)
+}
+
+func (r TagResultGauge32) String() string {
+	return fmt.Sprintf("%d", r)
+}
+
+// TagTimeTicks
+type TagResultTimeTicks int64
+
+func (r TagResultTimeTicks) Integer() int64 {
+	return int64(r)
+}
+
+func (r TagResultTimeTicks) String() string {
+	return fmt.Sprintf("%d", r)
+}
+
+// TagCounter64
+type TagResultCounter64 int64
+
+func (r TagResultCounter64) Integer() int64 {
+	return int64(r)
+}
+
+func (r TagResultCounter64) String() string {
+	return fmt.Sprintf("%d", r)
+}
+
+//
+// The "Fails"
+//
+
+// TagNull
+type TagResultNull struct{}
+
+func (r TagResultNull) Integer() int64 {
+	return 0
+}
+
+func (r TagResultNull) String() string {
+	return "NULL"
+}
+
+// TagNoSuchObject
+type TagResultNoSuchObject struct{}
+
+func (r TagResultNoSuchObject) Integer() int64 {
+	return 0
+}
+
+func (r TagResultNoSuchObject) String() string {
+	return "NO SUCH OBJECT"
+}
+
+// TagNoSuchInstance
+type TagResultNoSuchInstance struct{}
+
+func (r TagResultNoSuchInstance) Integer() int64 {
+	return 0
+}
+
+func (r TagResultNoSuchInstance) String() string {
+	return "NO SUCH INSTANCE"
+}
+
+//
+// FullDecode
+//
+
+type FullResult struct {
+	Value Taggish
+	Debug string // debugging messages
+	Error error  // decoding errors, not "No Such Object", "Null", etc
+}
+
+type Taggish interface {
+	Integer() int64
+}
+
+type FullDecodeResults map[Oid]*FullResult
+
+func (s GoSnmp) FullDecode(ur UnmarshalResults) (r FullDecodeResults) {
+	r = make(FullDecodeResults)
+
 	for oid, rv := range ur {
-
 		tag := rv.FullBytes[0]
 		switch tag {
 
 		// 0x01
 		case TagBoolean:
-			val := false // a "empty" bool
-			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
-				s.Logger.Printf("BOOLEAN: err: %v", err)
-			}
-			dr[oid] = val
-			s.Logger.Printf("BOOLEAN: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			var (
+				debug string
+				merr  error
+				val   bool
+			)
 
-		// 0x02, 0x41, 0x42, 0x43
-		case TagInteger, TagCounter32, TagGauge32, TagTimeTicks:
-			val := int64(0) // an "empty" integer
+			if _, merr = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
+				debug = fmt.Sprintf("BOOLEAN: err: %v", err)
+			} else {
+				debug = fmt.Sprintf("BOOLEAN: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			}
+
+			r[oid] = &FullResult{
+				Value: TagResultBoolean(val),
+				Debug: debug,
+				Error: merr,
+			}
+
+		// 0x02, 0x41, 0x42, 0x43, 0x46
+		case TagInteger, TagCounter32, TagGauge32, TagTimeTicks, TagCounter64:
+			var (
+				debug string
+				merr  error
+				val   int
+			)
+
 			// nasty hack: set Tag to Integer, so asn1 doesn't barf with
 			// "ASN.1 structure error: tags don't match". Unfortunately,
 			// asn1.parseFieldParameters (via UnmarshalWithParams) doesn't
@@ -69,91 +235,122 @@ func (s GoSnmp) DecodeI(ur UnmarshalResults) (dr DecodeResultsI) {
 			// probably (TODO) would the Unmarshalling handle
 			// classContextSpecific
 			rv.FullBytes[0] = TagInteger
-			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
-				s.Logger.Printf("INTEGER: err: %v", err)
+
+			if _, merr = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
+				debug = fmt.Sprintf("INTEGER: err: %v", err)
+			} else {
+				debug = fmt.Sprintf("INTEGER: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
 			}
-			s.Logger.Printf("INTEGER: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
-			dr[oid] = val
+
+			fr := &FullResult{
+				Debug: debug,
+				Error: merr,
+			}
+			switch tag {
+			case TagInteger:
+				fr.Value = TagResultInteger(val)
+			case TagCounter32:
+				fr.Value = TagResultCounter32(val)
+			case TagGauge32:
+				fr.Value = TagResultGauge32(val)
+			case TagTimeTicks:
+				fr.Value = TagResultTimeTicks(val)
+			case TagCounter64:
+				fr.Value = TagResultCounter64(val)
+			}
+			r[oid] = fr
 
 		// 0x04
 		case TagOctetString:
+			var (
+				debug string
+				merr  error
+				val   string
+			)
+
 			if len(rv.FullBytes) > 2 && rv.FullBytes[2] == 0x00 {
 				// I don't know what these strings that start with 00 are, but
 				// doing a hex dump gives the same result as netsnmp
-				s.Logger.Printf("STRINGO: 00 string")
-				val := fmt.Sprintf("% X", rv.FullBytes[2:]) + " "
-				dr[oid] = val
+				debug = "OCTETSTRING: 00 string"
+				val = fmt.Sprintf("% X", rv.FullBytes[2:]) + " "
 			} else {
-				val := []uint8{}
-				if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
-					s.Logger.Printf("STRINGO: err: %v", err)
+				ui := []uint8{}
+				if _, merr = asn1.Unmarshal(rv.FullBytes, &ui); err != nil {
+					debug = fmt.Sprintf("OCTETSTRING: err: %v", err)
+				} else {
+					val = string(ui)
+					debug = fmt.Sprintf("OCTETSTRING: fullbytes: % X, tag: %d, decode: %s", rv.FullBytes, tag, val)
 				}
-				s.Logger.Printf("STRINGO: fullbytes: % X, tag: %d, decode: %s", rv.FullBytes, tag, val)
-				dr[oid] = string(val)
+			}
+
+			r[oid] = &FullResult{
+				Value: TagResultOctetString(val),
+				Debug: debug,
+				Error: merr,
 			}
 
 		// 0x06
 		case TagOID:
-			val, _ := NewObjectIdentifier("0.0") // an "empty" OID
-			if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
-				s.Logger.Printf("OID: err: %v", err)
+			// TODO skip oids for the moment
+			r[oid] = &FullResult{
+				Value: new(TagResultOID),
 			}
-			dr[oid] = OidAsString(val)
-			s.Logger.Printf("OID: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			/*
+				val, _ := NewObjectIdentifier("0.0") // an "empty" OID
+				if _, err = asn1.Unmarshal(rv.FullBytes, &val); err != nil {
+					s.Logger.Printf("OID: err: %v", err)
+				}
+				r[oid] = OidAsString(val)
+				s.Logger.Printf("OID: fullbytes: % X, tag: %d, decode: %v", rv.FullBytes, tag, val)
+			*/
 
 		// 0x40
 		case TagIPAddress:
-			var val string
+			var (
+				debug string
+				val   string
+			)
+
 			for _, octet := range rv.Bytes {
 				val = val + "." + fmt.Sprintf("%v", octet)
 			}
 			val = val[1:]
-			s.Logger.Printf("IPADDRESS: fullbytes: % X, tag: %d, decode: %s", rv.FullBytes, tag, val)
-			dr[oid] = val
+			debug = fmt.Sprintf("IPADDRESS: fullbytes: % X, tag: %d, decode: %s", rv.FullBytes, tag, val)
 
-		// 0x05, 0x80, 0x81
-		case TagNull, TagNoSuchObject, TagNoSuchInstance:
-			dr[oid] = ""
+			r[oid] = &FullResult{
+				Value: TagResultIPAddress(val),
+				Debug: debug,
+			}
+
+		//
+		// The "Fails"
+		//
+
+		// 0x05
+		case TagNull:
+			r[oid] = &FullResult{
+				Value: new(TagResultNull),
+				Debug: fmt.Sprintf("NULL: fullbytes: % X, tag: %d", rv.FullBytes, tag),
+			}
+
+		// 0x80
+		case TagNoSuchObject:
+			r[oid] = &FullResult{
+				Value: new(TagResultNoSuchObject),
+				Debug: fmt.Sprintf("NOSUCHOBJECT: fullbytes: % X, tag: %d", rv.FullBytes, tag),
+			}
+
+		// 0x81
+		case TagNoSuchInstance:
+			r[oid] = &FullResult{
+				Value: new(TagResultNoSuchInstance),
+				Debug: fmt.Sprintf("NOSUCHINSTANCE: fullbytes: % X, tag: %d", rv.FullBytes, tag),
+			}
 
 		default:
 			// TODO cause an exit: want to *notice* unhandled tags
-			s.Logger.Fatalf("gonsmp: tag |%x| not decoded", tag)
-		}
+			s.Logger.Fatalf("gonsmp: tag |%x| unhandled", tag)
 
-	}
-	return
-}
-
-type DecodeResultsS map[Oid]string
-
-// DecodeS decodes UnmarshalResults, and returns all results as strings
-//
-// This is a convenience function - it just returns the result of %v
-// on all values from DecodeI()
-func (s GoSnmp) DecodeS(ur UnmarshalResults) (dr_s DecodeResultsS) {
-	dr_i := s.DecodeI(ur)
-	dr_s = make(DecodeResultsS)
-	for key, val := range dr_i {
-		dr_s[key] = fmt.Sprintf("%v", val)
-	}
-	return
-}
-
-type DecodeResultsN map[Oid]int64
-
-// DecodeN decodes UnmarshalResults, and returns all results as int64s
-//
-// This is a convenience function - it just returns the result of %v
-// on all values from DecodeI(), converted to int64's
-func (s GoSnmp) DecodeN(ur UnmarshalResults) (dr_n DecodeResultsN) {
-	dr_i := s.DecodeI(ur)
-	dr_n = make(DecodeResultsN)
-	for key, val := range dr_i {
-		val_s := fmt.Sprintf("%v", val)
-		if val_n, err := strconv.ParseInt(val_s, 10, 64); err == nil {
-			dr_n[key] = val_n
-		} else {
-			dr_n[key] = 0
 		}
 	}
 	return
