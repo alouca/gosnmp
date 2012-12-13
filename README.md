@@ -6,7 +6,7 @@ it only supports **GetRequest** with one or more Oids (varbinds).
 
 It is a rewrite of Andreas Louca's GoSNMP library
 [alouca/gosnmp](https://github.com/alouca/gosnmp) - many thanks for to
-him for starting the GoSNMP project. His code is in the 'old' directory.
+him for starting the GoSNMP project.
 
 The code is currently WIP (Work In Progress) - it still has rough edges
 and the API's may (will) change.
