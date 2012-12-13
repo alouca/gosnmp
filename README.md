@@ -35,28 +35,30 @@ Usage
 See **examples/walker.go** for a more detailed example of usage. In this snippet,
 **".1.2.3"**, **".4.5.6"** represent valid oids.
 
-    import "github.com/soniah/gosnmp"
+```go
+import "github.com/soniah/gosnmp"
 
-    // defaults: public, 2c, 5s timeout, discard logging
-    s := gosnmp.DefaultGoSNMP("192.168.1.10")         // target ip address/hostname
+// defaults: public, 2c, 5s timeout, discard logging
+s := gosnmp.DefaultGoSNMP("192.168.1.10")         // target ip address/hostname
 
-    // change some default values
-    s.Logger = log.New(os.Stderr, "", log.LstdFlags)  // log GoSnmp internals
-    s.Timeout = 60 * time.Second                      // target is slow
+// change some default values
+s.Logger = log.New(os.Stderr, "", log.LstdFlags)  // log GoSnmp internals
+s.Timeout = 60 * time.Second                      // target is slow
 
-    // or, use a struct initialiser
-	s := &gosnmp.GoSnmp{
-		Target:    "10.0.0.10",
-		Community: "private",
-		Version:   gosnmp.Version1,
-		Timeout:   2 * time.Second,
-		Logger:    log.New(ioutil.Discard, "", log.LstdFlags),      // no logging
-	}
+// or, use a struct initialiser
+s := &gosnmp.GoSnmp{
+	Target:    "10.0.0.10",
+	Community: "private",
+	Version:   gosnmp.Version1,
+	Timeout:   2 * time.Second,
+	Logger:    log.New(ioutil.Discard, "", log.LstdFlags),      // no logging
+}
 
-    ur := s.Get(".1.2.3")                             // s.Get takes one
-    ur := s.Get(".1.2.3", ".4.5.6")                   // or more
-    oids := []string{".1.2.3", ".4.5.6"}              // or more
-    ur := s.Get(oids...)                              // or more oids
+ur := s.Get(".1.2.3")                             // s.Get takes one
+ur := s.Get(".1.2.3", ".4.5.6")                   // or more
+oids := []string{".1.2.3", ".4.5.6"}              // or more
+ur := s.Get(oids...)                              // or more oids
+```
 
 **Get** returns it's results as **UnmarshalResults**, to give you the
 flexibility of implementing your own decoder:
