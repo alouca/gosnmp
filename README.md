@@ -13,6 +13,8 @@ and the API's may (will) change.
 
 Sonia Hamilton, sonia@snowfrog.net, http://www.snowfrog.net.
 
+**See also:** http://godoc.org/github.com/soniah/gosnmp
+
 Install
 -------
 
