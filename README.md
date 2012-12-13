@@ -108,6 +108,27 @@ suitable for testing/debugging:
 You may want to implement your own smaller/faster decoder based on
 **FullDecode()**.
 
+Helper Functions
+----------------
+
+There are a number of helper functions in common.go:
+
+**NewObjectIdentifier** - make a new asn1.ObjectIdentifier from an oid in
+string form.
+
+    func NewObjectIdentifier(oid string) (result asn1.ObjectIdentifier, err error) { ... }
+
+**gosnmp.WithinPercent()** - useful for testing if numeric values returned
+by an snmpget (or anything really) are within a certain percentage of each other.
+
+    // returns true if arg1 and arg2 are within percent % of each other
+    //
+    // two zero args are defined as being equal, one zero arg is defined as
+    // never being equal to anything else
+    //
+    // arg1 and arg2 can be anything numeric - int-like, float-like, uint-like
+    func WithinPercent(arg1 interface{}, arg2 interface{}, percent float64) (result bool, err error) { ... }
+
 BER vs DER
 ----------
 

@@ -424,22 +424,3 @@ func chunk(current_position, chunk_size, slice_length int) bool {
 	return false
 }
 
-// returns true if v1 and v2 are within percent of each other
-//
-// handles zeros in v1, v2 or both
-func within_percent(v1, v2, percent int64) (result bool) {
-	if v1 == 0 && v2 == 0 {
-		return true
-	}
-	if v1 == 0 || v2 == 0 {
-		return false
-	}
-	percentf := float64(percent) / float64(100)
-	if v1 > v2 {
-		v1, v2 = v2, v1
-	}
-	if (1 - (float64(v1) / float64(v2))) < percentf {
-		return true
-	}
-	return false
-}

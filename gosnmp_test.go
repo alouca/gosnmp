@@ -33,3 +33,39 @@ func TestNewObjectIdentifier(t *testing.T) {
 		}
 	}
 }
+
+var withinPercentTests = []struct {
+	arg1    interface{}
+	arg2    interface{}
+	percent float64
+	ok      bool
+	err     bool
+}{
+	{"a", "b", float64(1.0), false, true},                  // test all strings
+	{int(1.0), "b", float64(1.0), false, true},             // test one string
+	{int(0), int(0), float64(1.0), true, false},            // test all zeros
+	{int(0), int(1), float64(1.0), false, false},           // test one zero
+	{float64(42), float64(42), float64(1.0), true, false},  // test same - floats-like
+	{float64(42), float64(50), float64(1.0), false, false}, // test diff - floats-like
+	{int(42), int(42), float64(1.0), true, false},          // test same - int-like
+	{int(42), int(50), float64(1.0), false, false},         // test diff - int-like
+	{uint(42), uint(42), float64(1.0), true, false},        // test same - uint-like
+	{uint(42), uint(50), float64(1.0), false, false},       // test diff - uint-like
+	{int(42), float64(42), float64(1.0), true, false},      // test same - int-like vs float-like
+	{int(42), float64(50), float64(1.0), false, false},     // test diff - int-like vs float-like
+	{int(10), int(11), float64(10.0), true, false},         // test within percent
+	{int(10), int(12), float64(10.0), false, false},        // test outside percent
+}
+
+func TestWithinPercent(t *testing.T) {
+	for i, test := range withinPercentTests {
+		ok, err := WithinPercent(test.arg1, test.arg2, test.percent)
+		// fmt.Printf("i, err: %d, %v\n", i, err)
+		if (err != nil) != test.err {
+			t.Errorf("#%d: Incorrect error result (did fail? %v, expected: %v)", i, err == nil, test.err)
+		}
+		if ok != test.ok {
+			t.Errorf("#%d: Bad result: %v (expected %v)", i, ok, test.ok)
+		}
+	}
+}
