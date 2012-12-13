@@ -7,7 +7,6 @@ package gosnmp
 import (
 	"encoding/asn1"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 )
@@ -79,56 +78,106 @@ func OidAsString(o asn1.ObjectIdentifier) Oid {
 	return Oid("." + strings.Join(strings.Split(result, " "), "."))
 }
 
+// PartitionAll - partition a slice into multiple slices of given
+// length, with the last item possibly being of smaller length
+//
+// See also PartitionAllP for a description, or Clojure's partition-all
+// for an example in a different language.
+//
+func PartitionAll(slice []interface{}, partition_size int) (result [][]interface{}) {
+	var accumulator []interface{}
+	for counter, item := range slice {
+		accumulator = append(accumulator, item)
+		if PartitionAllP(counter, partition_size, len(slice)) {
+			result = append(result, accumulator)
+			accumulator = nil // "truncate" accumulator
+		}
+	}
+	return
+}
+
+// PartitionAllP - returns true when dividing a slice into
+// partition_size lengths, including last partition which may be smaller
+// than partition_size.
+//
+// For example for a slice of 8 items to be broken into partitions of
+// length 3, PartitionAllP returns true for the current_position having
+// the following values:
+//
+// 0  1  2  3  4  5  6  7
+//       T        T     T
+//
+// 'P' stands for Predicate (like foo? in Ruby, foop in Lisp)
+//
+func PartitionAllP(current_position, partition_size, slice_length int) bool {
+	if current_position <= 0 || current_position >= slice_length {
+		return false
+	}
+	if current_position%partition_size == partition_size-1 {
+		return true
+	}
+	if current_position == slice_length-1 {
+		return true
+	}
+	return false
+}
+
 // returns true if arg1 and arg2 are within percent % of each other
 //
-// two zero args are defined as being equal, one zero arg is defined as
-// never being equal to anything else
+// two zero args are defined as being within any percent of each other, one
+// zero arg is defined as never being within any percent of anything else
 //
 // arg1 and arg2 can be anything numeric - int-like, float-like, uint-like
-func WithinPercent(arg1 interface{}, arg2 interface{}, percent float64) (result bool, err error) {
-
-	var float1 float64
-	val1 := reflect.ValueOf(arg1)
-
-	switch t1 := arg1.(type) {
-	case int, int8, int16, int32, int64:
-		float1 = float64(val1.Int())
-	case uint, uint8, uint16, uint32, uint64:
-		float1 = float64(val1.Uint())
-	case float32, float64:
-		float1 = val1.Float()
-	default:
-		return false, fmt.Errorf("arg1 (type %T) isn't numeric", t1)
+func WithinPercent(arg1, arg2 interface{}, percent float64) (bool, error) {
+	f, err := toFloat64(arg1)
+	if err != nil {
+		return false, fmt.Errorf("cannot convert arg1: %s", err)
 	}
-
-	var float2 float64
-	val2 := reflect.ValueOf(arg2)
-	switch t2 := arg2.(type) {
-	case int, int8, int16, int32, int64:
-		float2 = float64(val2.Int())
-	case uint, uint8, uint16, uint32, uint64:
-		float2 = float64(val2.Uint())
-	case float32, float64:
-		float2 = val2.Float()
-	default:
-		return false, fmt.Errorf("arg2 (type %T) isn't numeric", t2)
+	g, err := toFloat64(arg2)
+	if err != nil {
+		return false, fmt.Errorf("cannot convert arg2: %s", err)
 	}
-
-	if reflect.DeepEqual(arg1, 0) && reflect.DeepEqual(arg2, 0) {
+	switch {
+	case f == 0 && g == 0:
 		return true, nil
-	}
-	if reflect.DeepEqual(arg1, 0) || reflect.DeepEqual(arg2, 0) {
+	case f == 0 || g == 0:
 		return false, nil
 	}
-
-	percentf := percent / float64(100)
-
-	if float1 > float2 {
-		float1, float2 = float2, float1
+	if f > g {
+		f, g = g, f
 	}
-	if (1 - (float1 / float2)) < percentf { // 1 - (smaller/larger)
-		return true, nil
-	}
+	return (1 - f/g) <= percent/100, nil
+}
 
-	return false, nil
+// convert i to float64 - helper function for WithinPercent()
+func toFloat64(i interface{}) (f float64, err error) {
+	switch v := i.(type) {
+	case int:
+		f = float64(v)
+	case int8:
+		f = float64(v)
+	case int16:
+		f = float64(v)
+	case int32:
+		f = float64(v)
+	case int64:
+		f = float64(v)
+	case uint:
+		f = float64(v)
+	case uint8:
+		f = float64(v)
+	case uint16:
+		f = float64(v)
+	case uint32:
+		f = float64(v)
+	case uint64:
+		f = float64(v)
+	case float32:
+		f = float64(v)
+	case float64:
+		f = v
+	default:
+		return 0, fmt.Errorf("non numeric type %T", v)
+	}
+	return f, nil
 }

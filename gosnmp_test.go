@@ -6,6 +6,7 @@ package gosnmp
 
 import (
 	"encoding/asn1"
+	"reflect"
 	"testing"
 )
 
@@ -66,6 +67,51 @@ func TestWithinPercent(t *testing.T) {
 		}
 		if ok != test.ok {
 			t.Errorf("#%d: Bad result: %v (expected %v)", i, ok, test.ok)
+		}
+	}
+}
+
+var partitionAllPTests = []struct {
+	cp int
+	ps int
+	sl int
+	ok bool
+}{
+	{-1, 3, 8, false}, // test out of range
+	{8, 3, 8, false},  // test out of range
+	{0, 3, 8, false},  // test 0-7/3 per doco
+	{1, 3, 8, false},
+	{2, 3, 8, true},
+	{3, 3, 8, false},
+	{4, 3, 8, false},
+	{5, 3, 8, true},
+	{6, 3, 8, false},
+	{7, 3, 8, true},
+}
+
+func TestPartitionAllP(t *testing.T) {
+	for i, test := range partitionAllPTests {
+		ok := PartitionAllP(test.cp, test.ps, test.sl)
+		if ok != test.ok {
+			t.Errorf("#%d: Bad result: %v (expected %v)", i, ok, test.ok)
+		}
+	}
+}
+
+var partitionAllTests = []struct {
+	in   []interface{}
+	size int
+	out  [][]interface{}
+}{
+	{[]interface{}{0, 1, 2, 3, 4, 5, 6, 7}, 3, [][]interface{}{{0, 1, 2}, {3, 4, 5}, {6, 7}}},
+	{[]interface{}{'a', 'b', 'c', 'd'}, 2, [][]interface{}{{'a', 'b'}, {'c', 'd'}}},
+}
+
+func TestPartitionAll(t *testing.T) {
+	for i, test := range partitionAllTests {
+		out := PartitionAll(test.in, test.size)
+		if !reflect.DeepEqual(out, test.out) {
+			t.Errorf("#%d: Bad result: %v (expected %v)", i, out, test.out)
 		}
 	}
 }

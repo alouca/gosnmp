@@ -7,6 +7,8 @@ package main
 // use gosnmp. I've haven't use command line options, rather you can
 // just un/comment sections of code to tweak behaviour.
 
+// TODO walker.go is currently a mess, I'll refactor/clean it soon...  Sonia
+
 import (
 	"bytes"
 	"fmt"
@@ -408,19 +410,3 @@ func die(err error) {
 		log.Fatal(err)
 	}
 }
-
-// chunk - returns true when dividing a slice into chunk_size long,
-// including last chunk which may be smaller than chunk_size
-func chunk(current_position, chunk_size, slice_length int) bool {
-	if current_position == 0 {
-		return false
-	}
-	if current_position%chunk_size == chunk_size-1 {
-		return true
-	}
-	if current_position == slice_length-1 {
-		return true
-	}
-	return false
-}
-

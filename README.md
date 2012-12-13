@@ -4,19 +4,19 @@ gosnmp
 GoSNMP is a simple SNMP client library, written fully in Go. Currently
 it only supports **GetRequest** with one or more Oids (varbinds).
 
-It is a rewrite of Andreas Louca's GoSNMP library (alouca/gosnmp) - many
-thanks for to him for starting the GoSNMP project. His code is in the
-'old' directory.
+It is a rewrite of Andreas Louca's GoSNMP library
+[alouca/gosnmp](https://github.com/alouca/gosnmp) - many thanks for to
+him for starting the GoSNMP project. His code is in the 'old' directory.
 
 The code is currently WIP (Work In Progress) - it still has rough edges
-and the API's may change.
+and the API's may (will) change.
 
 Sonia Hamilton, sonia@snowfrog.net, http://www.snowfrog.net.
 
 Install
 -------
 
-The easiest way to install is via go get:
+The easiest way to install is via **go get**:
 
     go get github.com/soniah/gosnmp
 
@@ -51,12 +51,12 @@ See **examples/walker.go** for a more detailed example of usage. In this snippet
 		Logger:    log.New(ioutil.Discard, "", log.LstdFlags),      // no logging
 	}
 
-    ur := s.Get(".1.2.3")                             // s.Get() takes one
+    ur := s.Get(".1.2.3")                             // s.Get takes one
     ur := s.Get(".1.2.3", ".4.5.6")                   // or more
     oids := []string{".1.2.3", ".4.5.6"}              // or more
     ur := s.Get(oids...)                              // or more oids
 
-**Get()** returns it's results as **UnmarshalResults**, to give you the
+**Get** returns it's results as **UnmarshalResults**, to give you the
 flexibility of implementing your own decoder:
 
     type UnmarshalResults map[Oid]asn1.RawValue
@@ -66,7 +66,7 @@ flexibility of implementing your own decoder:
 Decoders
 --------
 
-One decoder **FullDecode()** is currently implemented - it does a full decode
+One decoder **FullDecode** is currently implemented - it does a full decode
 suitable for testing/debugging:
 
     type FullResult struct {
@@ -106,34 +106,54 @@ suitable for testing/debugging:
     }
 
 You may want to implement your own smaller/faster decoder based on
-**FullDecode()**.
+**FullDecode**.
 
 Helper Functions
 ----------------
 
-There are a number of helper functions in common.go:
+There are a number of helper functions in **common.go**. Many of these have
+tests that serve as example usage; see also **examples/walker.go**.
 
 **NewObjectIdentifier** - make a new asn1.ObjectIdentifier from an oid in
 string form.
 
     func NewObjectIdentifier(oid string) (result asn1.ObjectIdentifier, err error) { ... }
 
-**gosnmp.WithinPercent()** - useful for testing if numeric values returned
-by an snmpget (or anything really) are within a certain percentage of each other.
+**PartitionAll** - partition a slice into multiple slices of given
+length, with the last item possibly being of smaller length.
 
-    // returns true if arg1 and arg2 are within percent % of each other
-    //
-    // two zero args are defined as being equal, one zero arg is defined as
-    // never being equal to anything else
-    //
-    // arg1 and arg2 can be anything numeric - int-like, float-like, uint-like
-    func WithinPercent(arg1 interface{}, arg2 interface{}, percent float64) (result bool, err error) { ... }
+    func PartitionAll(slice []interface{}, partition_size int) (result [][]interface{}) { ... }
+
+A use case for **PartitionAll** is you have a 'bazillion' oids to retrieve for
+a single device. You could:
+
+* send all bazillion oids in one **s.Get** - brave
+* do an **s.Bulkwalk** - but I haven't implemented that yet, and maybe
+  your target device only supports SNMP v1 anyway
+
+Instead, you could do:
+
+    oidss := []string{".1.2.3", ".4.5.6", ...... }   // a bazillion oids
+    for oids := range PartitionAll(oidss, 500) {     // value 500 will vary
+        ur := s.Get(oids...)
+        // process ur
+    }
+
+**PartitionAllP** - helper function for **PartitionAll**, but also
+useful by itself for dividing a slice into partitions.
+
+    func PartitionAllP(current_position, partition_size, slice_length int) bool { ... }
+
+**WithinPercent** - for testing if numeric values returned by snmpget
+(or anything really) are within a certain percentage of each other.
+
+    func WithinPercent(arg1, arg2 interface{}, percent float64) (bool, error) { ... }
 
 BER vs DER
 ----------
 
-SNMP uses BER (Basic Encoding Rules), whereas the golang asn1 package
-uses DER (Distinguished Encoding Rules).
+SNMP uses **BER** (Basic Encoding Rules), whereas the golang asn1 package
+uses **DER** (Distinguished Encoding Rules).
 
 DER is a subset of (ie stricter) than BER, therefore **sending** SNMP
 requests using DER is _ok_. For **receiving** SNMP results I have
@@ -162,10 +182,10 @@ Submitting Errors
 When you get GoSnmp errors due to the BER/DER issue, please email me
 with packet dumps suitable for reading by Wireshark.
 
-The easiest way to do this would be to write an examples/config.txt (see
-examples/config.in) with the oids that are giving problems, tweak/run
-examples/walker.go, then capture in Wireshark using a filter of "udp
-port 161 or udp port 162".
+The easiest way to do this would be to write an **examples/config.txt** (see
+**examples/config.in**) with the oids that are giving problems, tweak/run
+**examples/walker.go**, then capture in Wireshark using a filter of **udp
+port 161 or udp port 162**.
 
 See also
 --------
