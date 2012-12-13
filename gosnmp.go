@@ -1,7 +1,5 @@
-// Copyright 2012 Sonia Hamilton <sonia@snowfrog.net>. All rights
-// reserved.  Use of this source code is governed by a BSD-style license
-// that can be found in the LICENSE file.
-
+// GoSNMP is a simple SNMP client library, written fully in Go. Currently
+// it only supports **GetRequest** with one or more Oids (varbinds).
 package gosnmp
 
 import (
