@@ -77,19 +77,10 @@ func main() {
 	// conf.get_single_varbinds(oids_netsnmp.oids())
 	// log.Println("======================================")
 
-	// uncomment to see oids/values returned by gosnmp, when using random
-	// length oid varbinds
-	// conf.get_random_varbinds(oids_netsnmp.oids())
-	// log.Println("======================================")
-
 	// uncomment to see comparsion between results from netsnmp and
 	// gosnmp, when using single oid varbinds
 	conf.compare_single_varbinds(oids_netsnmp)
-	// log.Println("======================================")
 
-	// uncomment to see comparsion between results from netsnmp and
-	// gosnmp, when using random length varbinds
-	// conf.compare_random_varbinds(oids_netsnmp)
 }
 
 // load configuration from config_path
@@ -213,6 +204,7 @@ func extract(line string) (match bool, oid string, value string) {
 	return
 }
 
+// get varbinds one at a time using GoSnmp, print decoded line
 func (c Conf) get_single_varbinds(oids []string) {
 	s := gosnmp.GoSnmp{c.management_ip, c.community, c.version, 15 * time.Second, log.New(os.Stderr, "", log.LstdFlags)}
 
@@ -221,35 +213,7 @@ func (c Conf) get_single_varbinds(oids []string) {
 	}
 }
 
-func (c Conf) get_random_varbinds(oids []string) {
-	s := gosnmp.GoSnmp{c.management_ip, c.community, c.version, 15 * time.Second, log.New(os.Stderr, "", log.LstdFlags)}
-
-	r := rand.New(rand.NewSource(42)) // 42 arbitrary seed
-	const MAX_OIDS_SENT = 10
-	random_count := r.Intn(MAX_OIDS_SENT) + 1
-	var count int
-	var oidss []string
-
-	for _, oid := range oids {
-		oidss = append(oidss, oid)
-		count++
-		if count == random_count {
-			log.Println("--------------------------------------------")
-			log.Printf("oidss(%d):\n%s", count, strings.Join(oidss, "\n"))
-			print_varbinds(s.Get(oidss...))
-
-			oidss = nil // "truncate" oidss
-			count = 0
-			random_count = r.Intn(MAX_OIDS_SENT) + 1
-		}
-	}
-	// can't use chunk() here, as doing random counts,
-	// so handle last 'chunk' manually
-	log.Println("--------------------------------------------")
-	log.Printf("oidss(%d):\n%s", count, strings.Join(oidss, "\n"))
-	print_varbinds(s.Get(oidss...))
-}
-
+// print varbinds returned by GoSnmp
 func print_varbinds(ur gosnmp.UnmarshalResults, an_error error) {
 	if an_error != nil {
 		// TODO categorise errors in gosnmp
@@ -331,76 +295,6 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 		}
 
 	}
-}
-
-func (c Conf) compare_random_varbinds(oids results_t) {
-	//
-	// TODO nasty - refactor - lots of repeated code...
-	//
-	s := gosnmp.GoSnmp{c.management_ip, c.community, c.version, 5 * time.Second, log.New(os.Stderr, "", log.LstdFlags)}
-
-	r := rand.New(rand.NewSource(42)) // 42 arbitrary seed
-	const MAX_OIDS_SENT = 100
-	random_count := r.Intn(MAX_OIDS_SENT) + 1
-	var count int
-	var oidss []string
-	var go_val string
-	var fr *gosnmp.FullResult
-
-	for oid, _ := range oids {
-		oidss = append(oidss, oid)
-		count++
-
-		if count == random_count {
-			ur, geterr := s.Get(oidss...)
-			fd := s.FullDecode(ur)
-
-			for _, o := range oidss {
-				net_val := oids[o]
-				if geterr != nil {
-					go_val = fmt.Sprintf("%v", err)
-				} else {
-					fr = fd[gosnmp.Oid(o)]
-					if fr != nil {
-						go_val = fmt.Sprintf("%s", fr.Value)
-					}
-				}
-				if net_val != go_val {
-					log.Printf("oid|decode: %s|%#v\n\n", o, fr)
-					log.Printf("%60s|N G|%-20s\n\n", net_val, go_val)
-				}
-			}
-
-			oidss = nil // "truncate" oidss
-			count = 0
-			random_count = r.Intn(MAX_OIDS_SENT) + 1
-		}
-	}
-
-	// can't use chunk() here, as doing random counts,
-	// so handle last 'chunk' manually
-	ur, geterr := s.Get(oidss...)
-	fd := s.FullDecode(ur)
-
-	for _, o := range oidss {
-		net_val := oids[o]
-		if geterr != nil {
-			go_val = fmt.Sprintf("%v", err)
-		} else {
-			fr = fd[gosnmp.Oid(o)]
-			if fr != nil {
-				go_val = fmt.Sprintf("%s", fr.Value)
-			}
-		}
-		if net_val != go_val {
-			log.Printf("oid|decode: %s|%#v\n\n", o, fr)
-			log.Printf("%60s|N G|%-20s\n\n", net_val, go_val)
-		}
-	}
-
-	oidss = nil // "truncate" oidss
-	count = 0
-	random_count = r.Intn(MAX_OIDS_SENT) + 1
 }
 
 // die is a generic log and exit error handler
