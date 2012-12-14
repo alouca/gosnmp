@@ -63,9 +63,10 @@ ur := s.Get(oids...)                              // or more oids
 **Get** returns it's results as **UnmarshalResults**, to give you the
 flexibility of implementing your own decoder:
 
-    type UnmarshalResults map[Oid]asn1.RawValue
-
-    type Oid string
+```go
+type Oid string
+type UnmarshalResults map[Oid]asn1.RawValue
+```
 
 Decoders
 --------
@@ -73,41 +74,43 @@ Decoders
 One decoder **FullDecode** is currently implemented - it does a full decode
 suitable for testing/debugging:
 
-    type FullResult struct {
-        Value Taggish
-        Debug string // debugging messages
-        Error error  // decoding errors, not "No Such Object", "Null", etc
-    }
+```go
+type FullResult struct {
+    Value Taggish
+    Debug string // debugging messages
+    Error error  // decoding errors, not "No Such Object", "Null", etc
+}
 
-    type Taggish interface {
-        Integer() int64
-        fmt.Stringer
-    }
+type Taggish interface {
+    Integer() int64
+    fmt.Stringer
+}
 
-    type FullDecodeResults map[Oid]*FullResult
+type FullDecodeResults map[Oid]*FullResult
 
-    func (s GoSnmp) FullDecode(ur UnmarshalResults) (r FullDecodeResults) { ... }
+func (s GoSnmp) FullDecode(ur UnmarshalResults) (r FullDecodeResults) { ... }
 
-    // for example
-    fd := s.FullDecode(ur)
-    for oid, rv := range ur {
+// for example
+fd := s.FullDecode(ur)
+for oid, rv := range ur {
 
-        fmt.Println("oid:", oid)
+    fmt.Println("oid:", oid)
 
-        // raw value received from unmarshal
-        log.Printf("raw_value: %#v", rv)
+    // raw value received from unmarshal
+    log.Printf("raw_value: %#v", rv)
 
-        full_result := fd[oid]
+    full_result := fd[oid]
 
-        // tag type, eg TagResultOctetString, TagResultCounter32
-        fmt.Println("interface type:", reflect.TypeOf(full_result.Value))
+    // tag type, eg TagResultOctetString, TagResultCounter32
+    fmt.Println("interface type:", reflect.TypeOf(full_result.Value))
 
-        // I just want my result as a string
-        fmt.Printf("string decode: %s", full_result.Value)
+    // I just want my result as a string
+    fmt.Printf("string decode: %s", full_result.Value)
 
-        // I just want my result as a number
-        fmt.Printf("int decode: %d", full_result.Value.Integer())
-    }
+    // I just want my result as a number
+    fmt.Printf("int decode: %d", full_result.Value.Integer())
+}
+```
 
 You may want to implement your own smaller/faster decoder based on
 **FullDecode**.
@@ -121,12 +124,16 @@ tests that serve as example usage; see also **examples/walker.go**.
 **NewObjectIdentifier** - make a new asn1.ObjectIdentifier from an oid in
 string form.
 
-    func NewObjectIdentifier(oid string) (result asn1.ObjectIdentifier, err error) { ... }
+```go
+func NewObjectIdentifier(oid string) (result asn1.ObjectIdentifier, err error) { ... }
+```
 
 **PartitionAll** - partition a slice into multiple slices of given
 length, with the last item possibly being of smaller length.
 
-    func PartitionAll(slice []interface{}, partition_size int) (result [][]interface{}) { ... }
+```go
+func PartitionAll(slice []interface{}, partition_size int) (result [][]interface{}) { ... }
+```
 
 A use case for **PartitionAll** is you have a 'bazillion' oids to retrieve for
 a single device. You could:
@@ -137,21 +144,27 @@ a single device. You could:
 
 Instead, you could do:
 
-    oidss := []string{".1.2.3", ".4.5.6", ...... }   // a bazillion oids
-    for oids := range PartitionAll(oidss, 500) {     // value 500 will vary
-        ur := s.Get(oids...)
-        // process ur
-    }
+```go
+oidss := []string{".1.2.3", ".4.5.6", ...... }   // a bazillion oids
+for oids := range PartitionAll(oidss, 500) {     // value 500 will vary
+    ur := s.Get(oids...)
+    // process ur
+}
+```
 
 **PartitionAllP** - helper function for **PartitionAll**, but also
 useful by itself for dividing a slice into partitions.
 
-    func PartitionAllP(current_position, partition_size, slice_length int) bool { ... }
+```go
+func PartitionAllP(current_position, partition_size, slice_length int) bool { ... }
+```
 
 **WithinPercent** - for testing if numeric values returned by snmpget
 (or anything really) are within a certain percentage of each other.
 
-    func WithinPercent(arg1, arg2 interface{}, percent float64) (bool, error) { ... }
+```go
+func WithinPercent(arg1, arg2 interface{}, percent float64) (bool, error) { ... }
+```
 
 BER vs DER
 ----------
