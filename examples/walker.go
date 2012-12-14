@@ -14,7 +14,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"os"
 	"os/exec"
 	"reflect"
@@ -165,7 +164,7 @@ func (c Conf) using_netsnmp() (result results_t) {
 
 	// log.Printf("snmpget using:\n%+v\n\n", c)
 	for count, oid := range c.oids {
-		if !chunk(count, MAX_OIDS_SENT, len(c.oids)) {
+		if !gosnmp.PartitionAllP(count, MAX_OIDS_SENT, len(c.oids)) {
 			oidss = append(oidss, oid)
 		} else {
 			cmd_str = fmt.Sprintf("\"\"/usr/bin/snmpget -Oq -On -c %s -v %s %s %s\"\"",
@@ -186,7 +185,7 @@ func (c Conf) using_netsnmp() (result results_t) {
 				}
 			}
 
-			// handle chunking
+			// handle partitioning
 			oidss = nil // "truncate" oidss
 			oidss = append(oidss, oid)
 		}
