@@ -219,6 +219,13 @@ type Taggish interface {
 
 type FullDecodeResults map[Oid]*FullResult
 
+// FullDecode decodes the UnmarshalResults results returned by Get()
+//
+// note: after doing a s.Get() on an oid, UnmarshalResults *may not*
+// contain the oid as a key, because the target host has returned a
+// result for a *different* oid because of a SNMP "redirect". Therefore
+// when iterating FullDecodeResults, you must assume that the map lookup
+// on FullDecodeResults for your original oid *may* return nil.
 func (s GoSnmp) FullDecode(ur UnmarshalResults) (r FullDecodeResults) {
 	r = make(FullDecodeResults)
 
