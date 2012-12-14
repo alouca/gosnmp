@@ -268,8 +268,12 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 			}
 
 			c32 := reflect.TypeOf(*new(gosnmp.TagResultCounter32))
-			if tag == c32 && within_percent(net_val_n, go_val_n, 1) {
-				continue
+			if tag == c32 {
+				if ok, err := gosnmp.WithinPercent(net_val_n, go_val_n, 1); err != nil {
+					die(err)
+				} else if ok {
+					continue
+				}
 			}
 
 			tt := reflect.TypeOf(*new(gosnmp.TagResultTimeTicks))
