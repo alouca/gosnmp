@@ -1,131 +1,98 @@
-// Copyright 2012 Andreas Louca. All rights reserved.
-// Use of this source code is goverend by a BSD-style
-// license that can be found in the LICENSE file.
-
+// GoSNMP is a simple SNMP client library, written fully in Go. Currently
+// it only supports **GetRequest** with one or more Oids (varbinds).
 package gosnmp
 
 import (
 	"fmt"
-	l "github.com/alouca/gologger"
+	"io/ioutil"
+	"log"
 	"net"
 	"time"
 )
 
-type GoSNMP struct {
-	Target    string
-	Community string
-	Version   SnmpVersion
-	Timeout   time.Duration
-	conn      net.Conn
-	Log       *l.Logger
+type GoSnmp struct {
+	Target    string        // target - ip addr or hostname
+	Community string        // community eg "public"
+	Version   SnmpVersion   // Version1 or Version2c
+	Timeout   time.Duration // timeout for network connection
+	Logger    *log.Logger   // logger for debugging
 }
 
-func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*GoSNMP, error) {
-	// Open a UDP connection to the target
-	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", target), time.Duration(timeout)*time.Second)
-
-	if err != nil {
-		return nil, fmt.Errorf("Error establishing connection to host: %s\n", err.Error())
+func DefaultGoSnmp(target string) (s *GoSnmp) {
+	return &GoSnmp{
+		Target:    target,
+		Community: "public",
+		Version:   Version2c,
+		Timeout:   5 * time.Second,
+		Logger:    log.New(ioutil.Discard, "", log.LstdFlags),
 	}
-	s := &GoSNMP{target, community, version, time.Duration(timeout) * time.Second, conn, l.CreateLogger(false, false)}
-
-	return s, nil
 }
 
-// Enables verbose logging
-func (x *GoSNMP) SetVerbose(v bool) {
-	x.Log.VerboseFlag = v
-}
-
-// Enables debugging
-func (x *GoSNMP) SetDebug(d bool) {
-	x.Log.DebugFlag = d
-}
-
-// Sets the timeout for network read/write functions. Defaults to 5 seconds.
-func (x *GoSNMP) SetTimeout(seconds int64) {
-	if seconds <= 0 {
-		seconds = 5
-	}
-	x.Timeout = time.Duration(seconds) * time.Second
-}
-
-// StreamWalk will start walking a specified OID, and push through a channel the results
-// as it receives them, without waiting for the whole process to finish to return the 
-// results
-func (x *GoSNMP) StreamWalk(oid string, c chan *Variable) error {
-
-	return nil
-}
-
-// Walk will SNMP walk the target, blocking until the process is complete
-func (x *GoSNMP) Walk(oid string) ([]*Variable, error) {
-
-	return nil, nil
-}
-
-// Debug function
-func (x *GoSNMP) Debug(data []byte) (*SnmpPacket, error) {
-	packet, err := Unmarshal(data)
-
-	if err != nil {
-		return nil, fmt.Errorf("Unable to decode packet: %s\n", err.Error())
-	}
-	return packet, nil
-}
-
-// Sends an SNMP GET request to the target. Returns a Variable with the response or an error
-func (x *GoSNMP) Get(oid string) (*SnmpPacket, error) {
-	var err error
+// Get sends an SNMP GET request to the target for one or more oids.
+func (s GoSnmp) Get(oids ...string) (ur UnmarshalResults, err error) {
+	// this is a library - capture any panics and return as errors
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("%v", e)
+			err = fmt.Errorf("gosnmp: %s", e)
 		}
 	}()
 
-	// Set timeouts on the connection
-	deadline := time.Now()
-	x.conn.SetDeadline(deadline.Add(x.Timeout))
-
-	packet := new(SnmpPacket)
-
-	packet.Community = x.Community
-	packet.Error = 0
-	packet.ErrorIndex = 0
-	packet.RequestType = GetRequest
-	packet.Version = 1 // version 2
-	packet.Variables = []SnmpPDU{SnmpPDU{Name: oid, Type: Null}}
-
-	fBuf, err := packet.marshal()
-
-	if err != nil {
+	if err := s.check_parameters(oids); err != nil {
 		return nil, err
 	}
 
-	// Send the packet!
-	_, err = x.conn.Write(fBuf)
+	// connect
+	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", s.Target), s.Timeout)
 	if err != nil {
-		return nil, fmt.Errorf("Error writing to socket: %s\n", err.Error())
+		return nil, fmt.Errorf("gosnmp: Error connecting to socket: %s", err.Error())
 	}
-	// Try to read the response
-	resp := make([]byte, 2048, 2048)
-	n, err := x.conn.Read(resp)
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(s.Timeout))
 
-	if err != nil {
-		return nil, fmt.Errorf("Error reading from UDP: %s\n", err.Error())
-	}
-
-	pdu, err := Unmarshal(resp[:n])
-
-	if err != nil {
-		return nil, fmt.Errorf("Unable to decode packet: %s\n", err.Error())
-	} else {
-		if len(pdu.Variables) < 1 {
-			return nil, fmt.Errorf("No responses received.")
-		} else {
-			return pdu, nil
-		}
+	// marshal & send
+	var marshalled_msg []byte
+	if marshalled_msg, err = s.Marshal(oids); err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	_, err = conn.Write(marshalled_msg)
+	if err != nil {
+		return nil, fmt.Errorf("gosnmp: Error writing to socket: %s", err.Error())
+	}
+
+	// receive & unmarshal
+	response := make([]byte, 2048, 2048)
+	n, err := conn.Read(response)
+	if err != nil {
+		return nil, fmt.Errorf("gosnmp: Error reading from socket: %s", err.Error())
+	}
+	if ur, err = Unmarshal(response[:n]); err != nil {
+		return nil, fmt.Errorf("gosnmp: unmarshal %s", err.Error())
+	}
+	return
+}
+
+// check parameters for sanity
+func (s *GoSnmp) check_parameters(oids []string) (err error) {
+	var errstr string
+	if len(oids) == 0 {
+		errstr = errstr + "Get() requires at least one oid, "
+	}
+	if s.Target == "" {
+		errstr = errstr + "a Target is required, "
+	}
+	if s.Community == "" {
+		errstr = errstr + "a Community is required, "
+	}
+	if s.Timeout == 0 {
+		errstr = errstr + "a Timeout is required, "
+	}
+	if s.Logger == nil {
+		errstr = errstr + "a Logger is required (could be ioutil.Discard), "
+	}
+	if len(errstr) > 0 {
+		errstr = errstr[0:len(errstr)-2] + "."
+		return fmt.Errorf("gosnmp: %s", errstr)
+	}
+	return
 }

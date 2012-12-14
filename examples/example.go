@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/alouca/gosnmp"
+	"github.com/soniah/gosnmp"
 )
 
 var (
