@@ -7,8 +7,6 @@ package main
 // use gosnmp. I've haven't use command line options, rather you can
 // just un/comment sections of code to tweak behaviour.
 
-// TODO walker.go is currently a mess, I'll refactor/clean it soon...  Sonia
-
 import (
 	"bytes"
 	"fmt"
@@ -234,7 +232,7 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 	s := gosnmp.GoSnmp{c.management_ip, c.community, c.version, 15 * time.Second, log.New(os.Stderr, "", log.LstdFlags)}
 
 	for oid, _ := range oids {
-		var fr *gosnmp.FullResult
+		var full_result *gosnmp.FullResult
 		net_val := oids[oid]
 		net_val_n, _ := strconv.ParseInt(net_val, 10, 64)
 		go_val_n := int64(0)
@@ -245,10 +243,10 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 			go_val = fmt.Sprintf("%v", err)
 		} else {
 			fd := s.FullDecode(ur)
-			fr = fd[gosnmp.Oid(oid)]
-			if fr != nil {
-				go_val = fr.Value.String()
-				go_val_n = fr.Value.Integer()
+			full_result = fd[gosnmp.Oid(oid)]
+			if full_result != nil {
+				go_val = full_result.Value.String()
+				go_val_n = full_result.Value.Integer()
 			}
 		}
 
@@ -258,8 +256,8 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 		}
 
 		var tag reflect.Type
-		if fr != nil {
-			tag = reflect.TypeOf(fr.Value)
+		if full_result != nil {
+			tag = reflect.TypeOf(full_result.Value)
 
 			nsi := reflect.TypeOf(*new(gosnmp.TagResultNoSuchInstance))
 			if tag == nsi {
@@ -283,7 +281,7 @@ func (c Conf) compare_single_varbinds(oids results_t) {
 		}
 
 		if net_val != go_val || net_val_n != go_val_n {
-			log.Printf("oid|decode|tag: %s|%#v|%v\n", oid, fr, tag)
+			log.Printf("oid|decode|tag: %s|%#v|%v\n", oid, full_result, tag)
 			var comp string
 			if net_val != go_val {
 				comp = ">> DIFF STRING  <<"
