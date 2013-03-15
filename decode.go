@@ -17,6 +17,7 @@ const (
 	OctetString              = 0x04
 	Null                     = 0x05
 	ObjectIdentifier         = 0x06
+	Sequence                 = 0x30
 	Counter32                = 0x41
 	Gauge32                  = 0x42
 	TimeTicks                = 0x43
@@ -26,6 +27,12 @@ const (
 	Uinteger32               = 0x47
 	NoSuchObject             = 0x80
 	NoSuchInstance           = 0x81
+	GetRequest               = 0xa0
+	GetNextRequest           = 0xa1
+	GetResponse              = 0xa2
+	SetRequest               = 0xa3
+	Trap                     = 0xa4
+	GetBulkRequest           = 0xa5
 )
 
 // Different packet structure is needed during decode, to trick encoding/asn1 to decode the SNMP packet
@@ -33,6 +40,7 @@ const (
 type Variable struct {
 	Name  []int
 	Type  Asn1BER
+	Size  uint64
 	Value interface{}
 }
 
@@ -60,62 +68,15 @@ type Message struct {
 	Data      asn1.RawValue
 }
 
-func decode(data []byte) (*PDUResponse, error) {
-	m := Message{}
-	_, err := asn1.Unmarshal(data, &m)
-	if err != nil {
-		return nil, err
-	}
-	choice := m.Data.FullBytes[0]
-	switch choice {
-	// SNMP Response
-	case 0xa0, 0xa1, 0xa2:
-
-		pdu := new(PDU)
-
-		// hack ANY -> IMPLICIT SEQUENCE
-		m.Data.FullBytes[0] = 0x30
-		_, err = asn1.Unmarshal(m.Data.FullBytes, pdu)
-		if err != nil {
-			return nil, fmt.Errorf("Error decoding pdu: %#v, %#v, %s", m.Data.FullBytes, pdu, err)
-		}
-
-		// make response pdu
-		resp := new(PDUResponse)
-		// Copy values from parsed pdu
-		resp.RequestId = pdu.RequestId
-		resp.ErrorIndex = pdu.ErrorIndex
-		resp.ErrorStatus = pdu.ErrorStatus
-
-		resp.VarBindList = make([]*Variable, len(pdu.VarBindList))
-
-		// Decode all vars
-		for c, v := range pdu.VarBindList {
-
-			val, err := decodeValue(v.Value.FullBytes)
-			if err != nil {
-				return nil, err
-			} else {
-				val.Name = v.Name
-				resp.VarBindList[c] = val
-			}
-		}
-
-		return resp, nil
-	default:
-		return nil, fmt.Errorf("Unable to decode type: %#v\n", choice)
-	}
-	return nil, fmt.Errorf("Unknown CHOICE: %x", choice)
-}
-
-func decodeValue(data []byte) (retVal *Variable, err error) {
+func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	retVal = new(Variable)
+	retVal.Size = uint64(len(data))
 
-	switch Asn1BER(data[0]) {
+	switch Asn1BER(valueType) {
 
 	// Integer
 	case Integer:
-		ret, err := parseInt(data[2:])
+		ret, err := parseInt(data)
 		if err != nil {
 			break
 		}
@@ -124,17 +85,17 @@ func decodeValue(data []byte) (retVal *Variable, err error) {
 	// Octet
 	case OctetString:
 		retVal.Type = OctetString
-		retVal.Value = string(data[2:])
+		retVal.Value = string(data)
 	// Counter32
 	case Counter32:
-		ret, err := parseInt(data[2:])
+		ret, err := parseInt(data)
 		if err != nil {
 			break
 		}
 		retVal.Type = Counter32
 		retVal.Value = ret
 	case TimeTicks:
-		ret, err := parseInt(data[2:])
+		ret, err := parseInt(data)
 		if err != nil {
 			break
 		}
@@ -142,14 +103,14 @@ func decodeValue(data []byte) (retVal *Variable, err error) {
 		retVal.Value = ret
 	// Gauge32
 	case Gauge32:
-		ret, err := parseInt(data[2:])
+		ret, err := parseInt(data)
 		if err != nil {
 			break
 		}
 		retVal.Type = Gauge32
 		retVal.Value = ret
 	case Counter64:
-		ret, err := parseInt64(data[2:])
+		ret, err := parseInt64(data)
 
 		// Decode it
 		if err != nil {
@@ -163,7 +124,7 @@ func decodeValue(data []byte) (retVal *Variable, err error) {
 	case NoSuchObject:
 		return nil, fmt.Errorf("No such object")
 	default:
-		err = fmt.Errorf("Unable to decode %x - not implemented", data[0])
+		err = fmt.Errorf("Unable to decode %x - not implemented", valueType)
 	}
 
 	return

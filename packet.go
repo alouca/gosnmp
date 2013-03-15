@@ -8,18 +8,6 @@ import (
 	"strings"
 )
 
-type MessageType byte
-
-const (
-	Sequence       MessageType = 0x30
-	GetRequest     MessageType = 0xa0
-	GetNextRequest             = 0xa1
-	GetResponse                = 0xa2
-	SetRequest                 = 0xa3
-	Trap                       = 0xa4
-	GetBulkRequest             = 0xa5
-)
-
 type SnmpVersion uint8
 
 const (
@@ -39,7 +27,7 @@ func (s SnmpVersion) String() string {
 type SnmpPacket struct {
 	Version     SnmpVersion
 	Community   string
-	RequestType MessageType
+	RequestType Asn1BER
 	RequestID   uint8
 	Error       uint8
 	ErrorIndex  uint8
@@ -62,7 +50,7 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 	cursor := 0
 
 	// First bytes should be 0x30
-	if MessageType(packet[0]) == Sequence {
+	if Asn1BER(packet[0]) == Sequence {
 		// Parse packet length
 		var length int
 		// length of structure is spread over two bytes
@@ -100,7 +88,7 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 			}
 
 			// Parse SNMP packet type
-			switch MessageType(packet[cursor]) {
+			switch Asn1BER(packet[cursor]) {
 			case GetResponse:
 				log.Debug("SNMP Packet is get response\n")
 				response.RequestType = GetResponse
@@ -173,27 +161,17 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 					cursor += count
 					log.Debug("OID (%v) Field was %d bytes\n", rawOid, count)
 
-					var pduLength int
-					var paddedLength int = 0
+					valueType, length, valueData := parseField(packet[cursor:])
+					v, err := decodeValue(valueType, valueData)
 
-					if packet[cursor+1] == 0x81 {
-						pduLength = int(packet[cursor+2])
-						paddedLength = 1
-						log.Debug("Padded Variable length\n")
-					} else {
-						pduLength = int(packet[cursor+1])
-					}
-
-					log.Debug("PDU Value length: %d\n", pduLength)
-
-					v, err := decodeValue(packet[cursor : cursor+pduLength])
 					if err != nil {
 						return nil, fmt.Errorf("Error parsing PDU Value: %s", err.Error())
 					}
+
 					if oid, ok := rawOid.([]int); ok {
 						response.Variables = append(response.Variables, SnmpPDU{oidToString(oid), v.Type, v.Value})
 					}
-					cursor += pduLength + paddedLength + 2
+					cursor += int(length) + 1
 
 				}
 
@@ -207,6 +185,37 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 	}
 
 	return response, nil
+}
+
+// Parses a given field, return the ASN.1 BER Type, its lenght and the data
+func parseField(data []byte) (Asn1BER, uint64, []byte) {
+	log := l.GetDefaultLogger()
+
+	var asn1type Asn1BER
+
+	if len(data) == 0 {
+		return 0, 0, nil
+	}
+
+	asn1type = Asn1BER(data[0])
+
+	// Parse Length
+	length := data[1]
+	var finalLength uint64 = 2
+	cursor := 0
+	// Check if this is padded or not
+	if length > 0x80 {
+		length = length - 0x80
+		log.Debug("Field length is padded to %d bytes\n", length)
+		finalLength += Uvarint(data[2 : 2+length])
+		log.Debug("Decoded final length: %d\n", finalLength)
+		cursor = 2 + int(length)
+	} else {
+		finalLength += uint64(length)
+		cursor = 2
+	}
+
+	return asn1type, finalLength, data[cursor:]
 }
 
 func parseRawField(data []byte) (interface{}, int, error) {

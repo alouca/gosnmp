@@ -140,6 +140,16 @@ func parseInt(bytes []byte) (int, error) {
 	return int(ret64), nil
 }
 
+func Uvarint(buf []byte) (x uint64) {
+	for i, b := range buf {
+		x = x<<8 + uint64(b)
+		if i == 7 {
+			return
+		}
+	}
+	return
+}
+
 // BIT STRING
 
 // BitStringValue is the structure to use when you want an ASN.1 BIT STRING type. A
