@@ -86,6 +86,9 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	case OctetString:
 		retVal.Type = OctetString
 		retVal.Value = string(data)
+	case ObjectIdentifier:
+		retVal.Type = ObjectIdentifier
+		retVal.Value, _ = parseObjectIdentifier(data)
 	// Counter32
 	case Counter32:
 		ret, err := parseInt(data)
@@ -119,6 +122,11 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 
 		retVal.Type = Counter64
 		retVal.Value = ret
+	case Sequence:
+		// NOOP
+	case GetResponse:
+		// NOOP
+		retVal.Value = data
 	case NoSuchInstance:
 		return nil, fmt.Errorf("No such instance")
 	case NoSuchObject:

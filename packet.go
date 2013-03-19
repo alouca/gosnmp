@@ -42,143 +42,160 @@ type SnmpPDU struct {
 
 func Unmarshal(packet []byte) (*SnmpPacket, error) {
 	log := l.GetDefaultLogger()
+
+	log.Debug("Begin SNMP Packet unmarshal\n")
+
 	//var err error
 	response := new(SnmpPacket)
 	response.Variables = make([]SnmpPDU, 0, 5)
 
 	// Start parsing the packet
-	cursor := 0
+	var cursor uint64 = 0
 
 	// First bytes should be 0x30
 	if Asn1BER(packet[0]) == Sequence {
 		// Parse packet length
-		var length int
-		// length of structure is spread over two bytes
-		if packet[1] == 0x82 {
-			length = int(packet[2])<<8 | int(packet[3])
-			length += 4 // account for header + length
-			cursor += 4
+		ber, err := parseField(packet)
+		/*		var length int
+				// length of structure is spread over two bytes
+				if packet[1] == 0x82 {
+					length = int(packet[2])<<8 | int(packet[3])
+					length += 4 // account for header + length
+					cursor += 4
 
-		} else {
-			length = int(packet[1])
-			length += 2 // account for header + length
-			cursor += 2
+				} else {
+					length = int(packet[1])
+					length += 2 // account for header + length
+					cursor += 2
+				}*/
+
+		if err != nil {
+			log.Error("Unable to parse packet header: %s\n", err.Error())
+			return nil, err
 		}
 
-		if len(packet) == length {
-			log.Debug("Packet sanity verified, we got all the bytes (%d)\n", length)
-			// Parse SNMP Version
-			rawVersion, count, err := parseRawField(packet[cursor:])
+		log.Debug("Packet sanity verified, we got all the bytes (%d)\n", ber.DataLength)
+
+		cursor += ber.HeaderLength
+		// Parse SNMP Version
+		rawVersion, err := parseField(packet[cursor:])
+
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing SNMP packet version: %s", err.Error())
+		}
+
+		cursor += rawVersion.DataLength + rawVersion.HeaderLength
+		if version, ok := rawVersion.BERVariable.Value.(int); ok {
+			response.Version = SnmpVersion(version)
+		}
+
+		// Parse community
+		rawCommunity, err := parseField(packet[cursor:])
+		cursor += rawCommunity.DataLength + rawCommunity.HeaderLength
+
+		if community, ok := rawCommunity.BERVariable.Value.(string); ok {
+			response.Community = community
+			log.Debug("Parsed community %s\n", community)
+		}
+
+		rawPDU, err := parseField(packet[cursor:])
+
+		if err != nil {
+			log.Debug("Unable to parse SNMP PDU: %s\n", err.Error())
+		}
+
+		switch rawPDU.Type {
+		case GetResponse:
+			log.Debug("SNMP Packet is GetResponse\n")
+			log.Debug("PDU Size is %d\n", rawPDU.DataLength)
+			cursor += rawPDU.HeaderLength
+
+			// Parse Request ID
+			rawRequestId, err := parseField(packet[cursor:])
 
 			if err != nil {
-				return nil, fmt.Errorf("Error parsing SNMP packet version: %s", err.Error())
+				return nil, err
 			}
 
-			cursor += count
-			if version, ok := rawVersion.(int); ok {
-				response.Version = SnmpVersion(version)
+			cursor += rawRequestId.DataLength + rawRequestId.HeaderLength
+			if requestid, ok := rawRequestId.BERVariable.Value.(int); ok {
+				response.RequestID = uint8(requestid)
+				log.Debug("Parsed Request ID: %d\n", requestid)
 			}
 
-			// Parse community
-			rawCommunity, count, err := parseRawField(packet[cursor:])
-			cursor += count
-			if community, ok := rawCommunity.(string); ok {
-				response.Community = community
-				log.Debug("Parsed community %s\n", community)
+			// Parse Error
+			rawError, err := parseField(packet[cursor:])
+
+			if err != nil {
+				return nil, err
 			}
 
-			// Parse SNMP packet type
-			switch Asn1BER(packet[cursor]) {
-			case GetResponse:
-				log.Debug("SNMP Packet is get response\n")
-				response.RequestType = GetResponse
+			cursor += rawError.DataLength + rawError.HeaderLength
+			if errorNo, ok := rawError.BERVariable.Value.(int); ok {
+				response.Error = uint8(errorNo)
+			}
 
-				// Response length (dont really care what the length is)
-				if packet[cursor+1] == 0x82 {
-					cursor += 4
-				} else {
-					cursor += 2
-				}
-				log.Debug("Response length: %d\n", length)
+			// Parse Error Index
+			rawErrorIndex, err := parseField(packet[cursor:])
 
-				// Parse Request ID
-				rawRequestId, count, err := parseRawField(packet[cursor:])
+			if err != nil {
+				return nil, err
+			}
+
+			cursor += rawErrorIndex.DataLength + rawErrorIndex.HeaderLength
+
+			if errorindex, ok := rawErrorIndex.BERVariable.Value.(int); ok {
+				response.ErrorIndex = uint8(errorindex)
+			}
+
+			log.Debug("Request ID: %d Error: %d Error Index: %d\n", response.RequestID, response.Error, response.ErrorIndex)
+			rawResp, err := parseField(packet[cursor:])
+
+			if err != nil {
+				return nil, err
+			}
+
+			cursor += rawResp.HeaderLength
+			// Loop & parse Varbinds
+			for cursor < uint64(len(packet)) {
+				log.Debug("Parsing var bind response (Cursor at %d/%d)", cursor, len(packet))
+
+				rawVarbind, err := parseField(packet[cursor:])
 
 				if err != nil {
-					return nil, fmt.Errorf("Error parsing SNMP packet request ID: %s", err.Error())
+					return nil, err
 				}
 
-				cursor += count
-				if requestid, ok := rawRequestId.(int); ok {
-					response.RequestID = uint8(requestid)
-				}
+				cursor += rawVarbind.HeaderLength
+				log.Debug("Varbind length: %d/%d\n", rawVarbind.HeaderLength, rawVarbind.DataLength)
 
-				// Parse Error
-				rawError, count, err := parseRawField(packet[cursor:])
+				log.Debug("Parsing OID (Cursor at %d)\n", cursor)
+				// Parse OID
+				rawOid, err := parseField(packet[cursor:])
 
 				if err != nil {
-					return nil, fmt.Errorf("Error parsing SNMP packet error: %s", err.Error())
+					return nil, err
 				}
 
-				cursor += count
-				if errorNo, ok := rawError.(int); ok {
-					response.Error = uint8(errorNo)
-				}
+				cursor += rawOid.HeaderLength + rawOid.DataLength
 
-				// Parse Error Index
-				rawErrorIndex, count, err := parseRawField(packet[cursor:])
+				log.Debug("OID (%v) Field was %d bytes\n", rawOid, rawOid.DataLength)
+
+				rawValue, err := parseField(packet[cursor:])
 
 				if err != nil {
-					return nil, fmt.Errorf("Error parsing SNMP packet error index: %s", err.Error())
+					return nil, err
 				}
+				cursor += rawValue.HeaderLength + rawValue.DataLength
 
-				cursor += count
-				if errorindex, ok := rawErrorIndex.(int); ok {
-					response.ErrorIndex = uint8(errorindex)
+				log.Debug("Value field was %d bytes\n", rawValue.DataLength)
+
+				if oid, ok := rawOid.BERVariable.Value.([]int); ok {
+					log.Debug("Varbind decoding success\n")
+					response.Variables = append(response.Variables, SnmpPDU{oidToString(oid), rawValue.Type, rawValue.BERVariable.Value})
 				}
-
-				log.Debug("Request ID: %d Error: %d Error Index: %d\n", response.RequestID, response.Error, response.ErrorIndex)
-
-				// Varbind list
-				if packet[cursor] == 0x30 && packet[cursor+1] == 0x82 {
-					cursor += 4
-				} else {
-					cursor += 2
-				}
-
-				// Loop & parse Varbinds
-				for cursor < length {
-					log.Debug("Parsing var bind response (Cursor at %d/%d)", cursor, length)
-					if packet[cursor] == 0x30 && packet[cursor+1] == 0x82 {
-						cursor += 4
-						log.Debug("Padded Varbind length\n")
-					} else {
-						cursor += 2
-					}
-
-					// Parse OID
-					rawOid, count, err := parseRawField(packet[cursor:])
-					cursor += count
-					log.Debug("OID (%v) Field was %d bytes\n", rawOid, count)
-
-					valueType, length, valueData := parseField(packet[cursor:])
-					v, err := decodeValue(valueType, valueData)
-
-					if err != nil {
-						return nil, fmt.Errorf("Error parsing PDU Value: %s", err.Error())
-					}
-
-					if oid, ok := rawOid.([]int); ok {
-						response.Variables = append(response.Variables, SnmpPDU{oidToString(oid), v.Type, v.Value})
-					}
-					cursor += int(length) + 1
-
-				}
-
 			}
 
-		} else {
-			return nil, fmt.Errorf("Error verifying packet sanity: Got %d Expected: %d\n", len(packet), length)
 		}
 	} else {
 		return nil, fmt.Errorf("Invalid packet header\n")
@@ -187,35 +204,58 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 	return response, nil
 }
 
-// Parses a given field, return the ASN.1 BER Type, its lenght and the data
-func parseField(data []byte) (Asn1BER, uint64, []byte) {
-	log := l.GetDefaultLogger()
+type RawBER struct {
+	Type         Asn1BER
+	HeaderLength uint64
+	DataLength   uint64
+	Data         []byte
+	BERVariable  *Variable
+}
 
-	var asn1type Asn1BER
+// Parses a given field, return the ASN.1 BER Type, its header length and the data
+func parseField(data []byte) (*RawBER, error) {
+	log := l.GetDefaultLogger()
+	var err error
 
 	if len(data) == 0 {
-		return 0, 0, nil
+		return nil, fmt.Errorf("Unable to parse BER: Data length 0")
 	}
 
-	asn1type = Asn1BER(data[0])
+	ber := new(RawBER)
+
+	ber.Type = Asn1BER(data[0])
 
 	// Parse Length
 	length := data[1]
-	var finalLength uint64 = 2
-	cursor := 0
+
 	// Check if this is padded or not
 	if length > 0x80 {
 		length = length - 0x80
 		log.Debug("Field length is padded to %d bytes\n", length)
-		finalLength += Uvarint(data[2 : 2+length])
-		log.Debug("Decoded final length: %d\n", finalLength)
-		cursor = 2 + int(length)
+		ber.DataLength = Uvarint(data[2 : 2+length])
+		log.Debug("Decoded final length: %d\n", ber.DataLength)
+
+		ber.HeaderLength = 2 + uint64(length)
+
 	} else {
-		finalLength += uint64(length)
-		cursor = 2
+		ber.HeaderLength = 2
+		ber.DataLength = uint64(length)
 	}
 
-	return asn1type, finalLength, data[cursor:]
+	// Do sanity checks
+	if ber.DataLength > uint64(len(data)) {
+		return nil, fmt.Errorf("Unable to parse BER: provided data length is longer than actual data (%d vs %d)", ber.DataLength, len(data))
+	}
+
+	ber.Data = data[ber.HeaderLength : ber.HeaderLength+ber.DataLength]
+
+	ber.BERVariable, err = decodeValue(ber.Type, ber.Data)
+
+	if err != nil {
+		return nil, fmt.Errorf("Unable to decode value: %s\n", err.Error())
+	}
+
+	return ber, nil
 }
 
 func parseRawField(data []byte) (interface{}, int, error) {
