@@ -56,18 +56,6 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 	if Asn1BER(packet[0]) == Sequence {
 		// Parse packet length
 		ber, err := parseField(packet)
-		/*		var length int
-				// length of structure is spread over two bytes
-				if packet[1] == 0x82 {
-					length = int(packet[2])<<8 | int(packet[3])
-					length += 4 // account for header + length
-					cursor += 4
-
-				} else {
-					length = int(packet[1])
-					length += 2 // account for header + length
-					cursor += 2
-				}*/
 
 		if err != nil {
 			log.Error("Unable to parse packet header: %s\n", err.Error())
