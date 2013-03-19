@@ -5,7 +5,6 @@
 package gosnmp
 
 import (
-	"encoding/asn1"
 	"fmt"
 )
 
@@ -35,37 +34,11 @@ const (
 	GetBulkRequest           = 0xa5
 )
 
-// Different packet structure is needed during decode, to trick encoding/asn1 to decode the SNMP packet
-
 type Variable struct {
 	Name  []int
 	Type  Asn1BER
 	Size  uint64
 	Value interface{}
-}
-
-type VarBind struct {
-	Name  asn1.ObjectIdentifier
-	Value asn1.RawValue
-}
-
-type PDU struct {
-	RequestId   int32
-	ErrorStatus int
-	ErrorIndex  int
-	VarBindList []VarBind
-}
-type PDUResponse struct {
-	RequestId   int32
-	ErrorStatus int
-	ErrorIndex  int
-	VarBindList []*Variable
-}
-
-type Message struct {
-	Version   int
-	Community []uint8
-	Data      asn1.RawValue
 }
 
 func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
@@ -124,6 +97,7 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 		retVal.Value = ret
 	case Sequence:
 		// NOOP
+		retVal.Value = data
 	case GetResponse:
 		// NOOP
 		retVal.Value = data
