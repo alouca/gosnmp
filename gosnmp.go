@@ -66,38 +66,10 @@ func (x *GoSNMP) Walk(oid string) ([]*Variable, error) {
 	return nil, nil
 }
 
-// Debug function. Unmarshals raw bytes and returns the result without the network part
-func (x *GoSNMP) Debug(data []byte) (*SnmpPacket, error) {
-	packet, err := Unmarshal(data)
-
-	if err != nil {
-		return nil, fmt.Errorf("Unable to decode packet: %s\n", err.Error())
-	}
-	return packet, nil
-}
-
-// Sends an SNMP GET request to the target. Returns a Variable with the response or an error
-func (x *GoSNMP) Get(oid string) (*SnmpPacket, error) {
-	var err error
-	defer func() {
-		if e := recover(); e != nil {
-			err = fmt.Errorf("%v", e)
-		}
-	}()
-
+func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 	// Set timeouts on the connection
 	deadline := time.Now()
 	x.conn.SetDeadline(deadline.Add(x.Timeout))
-
-	// Create the packet
-	packet := new(SnmpPacket)
-
-	packet.Community = x.Community
-	packet.Error = 0
-	packet.ErrorIndex = 0
-	packet.RequestType = GetRequest
-	packet.Version = 1 // version 2
-	packet.Variables = []SnmpPDU{SnmpPDU{Name: oid, Type: Null}}
 
 	// Marshal it
 	fBuf, err := packet.marshal()
@@ -133,4 +105,57 @@ func (x *GoSNMP) Get(oid string) (*SnmpPacket, error) {
 	}
 
 	return nil, nil
+}
+
+func (x *GoSNMP) GetNext(oid string) (*SnmpPacket, error) {
+	var err error
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
+	// Create the packet
+	packet := new(SnmpPacket)
+
+	packet.Community = x.Community
+	packet.Error = 0
+	packet.ErrorIndex = 0
+	packet.RequestType = GetNextRequest
+	packet.Version = 1 // version 2
+	packet.Variables = []SnmpPDU{SnmpPDU{Name: oid, Type: Null}}
+
+	return x.sendPacket(packet)
+}
+
+// Debug function. Unmarshals raw bytes and returns the result without the network part
+func (x *GoSNMP) Debug(data []byte) (*SnmpPacket, error) {
+	packet, err := Unmarshal(data)
+
+	if err != nil {
+		return nil, fmt.Errorf("Unable to decode packet: %s\n", err.Error())
+	}
+	return packet, nil
+}
+
+// Sends an SNMP GET request to the target. Returns a Variable with the response or an error
+func (x *GoSNMP) Get(oid string) (*SnmpPacket, error) {
+	var err error
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
+	// Create the packet
+	packet := new(SnmpPacket)
+
+	packet.Community = x.Community
+	packet.Error = 0
+	packet.ErrorIndex = 0
+	packet.RequestType = GetRequest
+	packet.Version = 1 // version 2
+	packet.Variables = []SnmpPDU{SnmpPDU{Name: oid, Type: Null}}
+
+	return x.sendPacket(packet)
 }
