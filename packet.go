@@ -258,30 +258,6 @@ func parseField(data []byte) (*RawBER, error) {
 	return ber, nil
 }
 
-func parseRawField(data []byte) (interface{}, int, error) {
-	switch Asn1BER(data[0]) {
-	case Integer:
-		length := int(data[1])
-		if length == 1 {
-			return int(data[2]), 3, nil
-		} else {
-			resp, err := parseInt(data[2:(1 + length)])
-			return resp, 2 + length, err
-		}
-	case OctetString:
-		length := int(data[1])
-		return string(data[2 : 2+length]), length + 2, nil
-	case ObjectIdentifier:
-		length := int(data[1])
-		oid, err := parseObjectIdentifier(data[2 : 2+length])
-		return oid, length + 2, err
-	default:
-		return nil, 0, fmt.Errorf("Unknown field type: %x\n", data[0])
-	}
-
-	return nil, 0, nil
-}
-
 func (packet *SnmpPacket) marshal() ([]byte, error) {
 	// Prepare the buffer to send
 	buffer := make([]byte, 0, 1024)
