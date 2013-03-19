@@ -60,8 +60,8 @@ func main() {
 	}
 
 	s, err := gosnmp.NewGoSNMP(cmdTarget, cmdCommunity, gosnmp.Version2c, cmdTimeout)
-	s.SetDebug(true)
-	s.SetVerbose(true)
+	s.SetDebug(false)
+	s.SetVerbose(false)
 	if err != nil {
 		fmt.Printf("Error creating SNMP instance: %s\n", err.Error())
 		return
