@@ -313,7 +313,7 @@ func marshalPDU(pdu *SnmpPDU) ([]byte, error) {
 		pduBuf.Write(oid)
 		pduBuf.Write([]byte{Null, 0x00})
 	default:
-		return nil, fmt.Errorf("Unable to marshal PDU: uknown BER type %d", pdu.Type)
+		return nil, fmt.Errorf("Unable to marshal PDU: unknown BER type %d", pdu.Type)
 	}
 
 	return pduBuf.Bytes(), nil

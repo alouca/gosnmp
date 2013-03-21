@@ -66,6 +66,8 @@ func (x *GoSNMP) Walk(oid string) ([]*Variable, error) {
 	return nil, nil
 }
 
+// Marshals & send an SNMP request. Unmarshals the response and returns back the parsed
+// SNMP packet
 func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 	// Set timeouts on the connection
 	deadline := time.Now()
@@ -107,6 +109,7 @@ func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 	return nil, nil
 }
 
+// Sends an SNMP Get Next Request to the target. Returns the next variable response from the OID given or an error
 func (x *GoSNMP) GetNext(oid string) (*SnmpPacket, error) {
 	var err error
 	defer func() {
@@ -156,6 +159,32 @@ func (x *GoSNMP) Get(oid string) (*SnmpPacket, error) {
 	packet.RequestType = GetRequest
 	packet.Version = 1 // version 2
 	packet.Variables = []SnmpPDU{SnmpPDU{Name: oid, Type: Null}}
+
+	return x.sendPacket(packet)
+}
+
+// Sends an SNMP GET request to the target. Returns a Variable with the response or an error
+func (x *GoSNMP) GetMulti(oids []string) (*SnmpPacket, error) {
+	var err error
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
+	// Create the packet
+	packet := new(SnmpPacket)
+
+	packet.Community = x.Community
+	packet.Error = 0
+	packet.ErrorIndex = 0
+	packet.RequestType = GetRequest
+	packet.Version = 1 // version 2
+	packet.Variables = make([]SnmpPDU, len(oids))
+
+	for i, oid := range oids {
+		packet.Variables[i] = SnmpPDU{Name: oid, Type: Null}
+	}
 
 	return x.sendPacket(packet)
 }
