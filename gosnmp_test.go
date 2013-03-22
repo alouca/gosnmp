@@ -16,6 +16,15 @@ var (
 	}
 )
 
+func BenchmarkUnmarshal(t *testing.B) {
+	t.Log("Running Decode Benchmark\n")
+	packet, _ := hex.DecodeString(TestPackets[0])
+	s, _ := NewGoSNMP("", "", Version2c, 5)
+	for i := 0; i < t.N; i++ {
+		s.Debug(packet)
+	}
+}
+
 func TestDecode(t *testing.T) {
 	t.Log("Running Decode Test\n")
 	s, _ := NewGoSNMP("", "", Version2c, 5)
