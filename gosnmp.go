@@ -61,9 +61,20 @@ func (x *GoSNMP) StreamWalk(oid string, c chan *Variable) error {
 }
 
 // Walk will SNMP walk the target, blocking until the process is complete
-func (x *GoSNMP) Walk(oid string) ([]*Variable, error) {
+func (x *GoSNMP) Walk(oid string) (results []SnmpPDU, err error) {
+	results = make([]SnmpPDU, 0)
+	for res, err := x.GetNext(oid); err == nil; res, err = x.GetNext(oid) {
+		if len(res.Variables) > 0 {
+			results = append(results, res.Variables[0])
 
-	return nil, nil
+			// Set to the next
+			oid = res.Variables[0].Name
+			x.Log.Debug("Moving to %s\n", oid)
+		} else {
+			break
+		}
+	}
+	return
 }
 
 // Marshals & send an SNMP request. Unmarshals the response and returns back the parsed
