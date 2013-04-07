@@ -58,7 +58,7 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	// Octet
 	case OctetString:
 		retVal.Type = OctetString
-		retVal.Value = string(data)
+		retVal.Value = data
 	case ObjectIdentifier:
 		retVal.Type = ObjectIdentifier
 		retVal.Value, _ = parseObjectIdentifier(data)
