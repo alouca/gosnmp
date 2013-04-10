@@ -53,7 +53,9 @@ func TestDecode(t *testing.T) {
 
 func TestWalk(t *testing.T) {
 	t.Log("Running walk test")
-	s, _ := NewGoSNMP("dev.autonutus.com", "public", Version2c, 5)
+	s, _ := NewGoSNMP("sample", "demo", Version2c, 5)
+	s.SetDebug(true)
+	s.SetVerbose(true)
 	res, err := s.Walk(".1.3.6.1.2.1.2")
 
 	if err != nil {

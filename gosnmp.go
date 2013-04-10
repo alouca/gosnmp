@@ -8,6 +8,7 @@ import (
 	"fmt"
 	l "github.com/alouca/gologger"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -63,13 +64,18 @@ func (x *GoSNMP) StreamWalk(oid string, c chan *Variable) error {
 // Walk will SNMP walk the target, blocking until the process is complete
 func (x *GoSNMP) Walk(oid string) (results []SnmpPDU, err error) {
 	results = make([]SnmpPDU, 0)
+	requestOid := oid
 	for res, err := x.GetNext(oid); err == nil; res, err = x.GetNext(oid) {
 		if len(res.Variables) > 0 {
-			results = append(results, res.Variables[0])
-
-			// Set to the next
-			oid = res.Variables[0].Name
-			x.Log.Debug("Moving to %s\n", oid)
+			if strings.Index(res.Variables[0].Name, requestOid) > -1 {
+				results = append(results, res.Variables[0])
+				// Set to the next
+				oid = res.Variables[0].Name
+				x.Log.Debug("Moving to %s\n", oid)
+			} else {
+				x.Log.Debug("Root OID mismatch, stopping walk\n")
+				break
+			}
 		} else {
 			break
 		}
