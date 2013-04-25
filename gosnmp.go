@@ -63,6 +63,9 @@ func (x *GoSNMP) StreamWalk(oid string, c chan *Variable) error {
 
 // Walk will SNMP walk the target, blocking until the process is complete
 func (x *GoSNMP) Walk(oid string) (results []SnmpPDU, err error) {
+	if oid == nil {
+		return nil, fmt.Errorf("No OID given\n")
+	}
 	results = make([]SnmpPDU, 0)
 	requestOid := oid
 	for res, err := x.GetNext(oid); err == nil; res, err = x.GetNext(oid) {
