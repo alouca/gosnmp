@@ -21,11 +21,17 @@ type GoSNMP struct {
 	Log       *l.Logger
 }
 
+var DEFAULT_PORT = 161
+
 // Creates a new SNMP Client. Target is the IP address, Community the SNMP Community String and Version the SNMP version.
 // Currently only v2c is supported. Timeout parameter is measured in seconds.
 func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*GoSNMP, error) {
+	if !strings.Contains(target, ":") {
+		target = fmt.Sprintf("%s:%d", target, DEFAULT_PORT)
+	}
+
 	// Open a UDP connection to the target
-	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:161", target), time.Duration(timeout)*time.Second)
+	conn, err := net.DialTimeout("udp", target, time.Duration(timeout)*time.Second)
 
 	if err != nil {
 		return nil, fmt.Errorf("Error establishing connection to host: %s\n", err.Error())
