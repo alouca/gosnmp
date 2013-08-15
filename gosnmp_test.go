@@ -67,3 +67,18 @@ func TestWalk(t *testing.T) {
 	}
 
 }
+
+// Test SNMP connections with different ports
+func TestConnect(t *testing.T) {
+        t.Log("Running connection tests")
+        targets := []string{"localhost", "localhost:161"}
+
+        for _, target := range targets {
+                _, err := NewGoSNMP(target, "public", Version2c, 5)
+
+                if err != nil {
+                        t.Fatalf("Unable to connect to %s: %s\n", target, err)
+                }
+        }
+}
+
