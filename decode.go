@@ -10,6 +10,7 @@ import (
 
 type Asn1BER byte
 
+// SNMP Data Types
 const (
 	Integer          Asn1BER = 0x02
 	BitString                = 0x03
@@ -33,6 +34,42 @@ const (
 	Trap                     = 0xa4
 	GetBulkRequest           = 0xa5
 )
+
+// String representations of each SNMP Data Type
+var dataTypeStrings = map[Asn1BER]string{
+	Integer:          "Integer",
+	BitString:        "BitString",
+	OctetString:      "OctetString",
+	Null:             "Null",
+	ObjectIdentifier: "ObjectIdentifier",
+	Sequence:         "Sequence",
+	Counter32:        "Counter32",
+	Gauge32:          "Gauge32",
+	TimeTicks:        "TimeTicks",
+	Opaque:           "Opaque",
+	NsapAddress:      "NsapAddress",
+	Counter64:        "Counter64",
+	Uinteger32:       "Uinteger32",
+	NoSuchObject:     "NoSuchObject",
+	NoSuchInstance:   "NoSuchInstance",
+	GetRequest:       "GetRequest",
+	GetNextRequest:   "GetNextRequest",
+	GetResponse:      "GetResponse",
+	SetRequest:       "SetRequest",
+	Trap:             "Trap",
+	GetBulkRequest:   "GetBulkRequest",
+}
+
+func (dataType Asn1BER) String() string {
+	str, ok := dataTypeStrings[dataType]
+
+	if !ok {
+		str = "Unknown"
+	}
+
+	return str
+}
+
 
 type Variable struct {
 	Name  []int
