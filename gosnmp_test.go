@@ -82,3 +82,21 @@ func TestConnect(t *testing.T) {
         }
 }
 
+// Test Data Type stringer
+func TestDataTypeStrings(t *testing.T) {
+	var dataType Asn1BER
+
+	// Defined data type
+	dataType = Integer
+
+	if dataType.String() != "Integer" {
+		t.Errorf("Data Type strings:\n\twant: %q\n\tgot : %q", "Integer", dataType)
+	}
+
+	// Undefined data type
+	dataType = 0x00
+
+	if dataType.String() != "Unknown" {
+		t.Errorf("Data Type strings:\n\twant: %q\n\tgot : %q", "Integer", dataType)
+	}
+}
