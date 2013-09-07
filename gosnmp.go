@@ -60,7 +60,7 @@ func (x *GoSNMP) SetTimeout(seconds int64) {
 }
 
 // StreamWalk will start walking a specified OID, and push through a channel the results
-// as it receives them, without waiting for the whole process to finish to return the 
+// as it receives them, without waiting for the whole process to finish to return the
 // results
 func (x *GoSNMP) StreamWalk(oid string, c chan *Variable) error {
 
@@ -170,6 +170,34 @@ func (x *GoSNMP) Debug(data []byte) (*SnmpPacket, error) {
 		return nil, fmt.Errorf("Unable to decode packet: %s\n", err.Error())
 	}
 	return packet, nil
+}
+
+// Sends an SNMP BULK-GET request to the target. Returns a Variable with the response or an error
+func (x *GoSNMP) GetBulk(non_repeaters, max_repetitions uint8, oids ...string) (*SnmpPacket, error) {
+	var err error
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
+	// Create the packet
+	packet := new(SnmpPacket)
+
+	packet.Community = x.Community
+	packet.NonRepeaters = non_repeaters
+	packet.MaxRepetitions = max_repetitions
+	packet.RequestType = GetBulkRequest
+	packet.Version = 1 // version 2
+	packet.Variables = make([]SnmpPDU, len(oids))
+
+	for i, oid := range oids {
+		packet.Variables[i] = SnmpPDU{Name: oid, Type: Null}
+	}
+
+	return x.sendPacket(packet)
+
+	return x.sendPacket(packet)
 }
 
 // Sends an SNMP GET request to the target. Returns a Variable with the response or an error
