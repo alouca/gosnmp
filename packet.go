@@ -25,13 +25,15 @@ func (s SnmpVersion) String() string {
 }
 
 type SnmpPacket struct {
-	Version     SnmpVersion
-	Community   string
-	RequestType Asn1BER
-	RequestID   uint8
-	Error       uint8
-	ErrorIndex  uint8
-	Variables   []SnmpPDU
+	Version        SnmpVersion
+	Community      string
+	RequestType    Asn1BER
+	RequestID      uint8
+	Error          uint8
+	ErrorIndex     uint8
+	NonRepeaters   uint8
+	MaxRepetitions uint8
+	Variables      []SnmpPDU
 }
 
 type SnmpPDU struct {
@@ -262,7 +264,22 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 	snmpPduBuffer := make([]byte, 0, 1024)
 	snmpPduBuf := bytes.NewBuffer(snmpPduBuffer)
 
-	snmpPduBuf.Write([]byte{byte(packet.RequestType), 0, 2, 1, packet.RequestID, 2, 1, packet.Error, 2, 1, packet.ErrorIndex, byte(Sequence), 0})
+	snmpPduBuf.Write([]byte{byte(packet.RequestType), 0, 2, 1, packet.RequestID})
+
+	switch packet.RequestType {
+	case GetBulkRequest:
+		snmpPduBuf.Write([]byte{
+			2, 1, packet.NonRepeaters,
+			2, 1, packet.MaxRepetitions,
+		})
+	default:
+		snmpPduBuf.Write([]byte{
+			2, 1, packet.Error,
+			2, 1, packet.ErrorIndex,
+		})
+	}
+
+	snmpPduBuf.Write([]byte{byte(Sequence), 0})
 
 	pduLength := 0
 	for _, varlist := range packet.Variables {
@@ -283,7 +300,7 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 
 	buf.Write(pduBytes)
 
-	// Write the 
+	// Write the
 	//buf.Write([]byte{packet.RequestType, uint8(17 + len(mOid)), 2, 1, 1, 2, 1, 0, 2, 1, 0, 0x30, uint8(6 + len(mOid)), 0x30, uint8(4 + len(mOid)), 6, uint8(len(mOid))})
 	//buf.Write(mOid)
 	//buf.Write([]byte{5, 0})
