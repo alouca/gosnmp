@@ -6,6 +6,7 @@ package gosnmp
 
 import (
 	"fmt"
+	"net"
 )
 
 type Asn1BER byte
@@ -18,6 +19,7 @@ const (
 	Null                     = 0x05
 	ObjectIdentifier         = 0x06
 	Sequence                 = 0x30
+	IpAddress                = 0x40
 	Counter32                = 0x41
 	Gauge32                  = 0x42
 	TimeTicks                = 0x43
@@ -42,6 +44,7 @@ var dataTypeStrings = map[Asn1BER]string{
 	OctetString:      "OctetString",
 	Null:             "Null",
 	ObjectIdentifier: "ObjectIdentifier",
+	IpAddress:        "IpAddress",
 	Sequence:         "Sequence",
 	Counter32:        "Counter32",
 	Gauge32:          "Gauge32",
@@ -69,7 +72,6 @@ func (dataType Asn1BER) String() string {
 
 	return str
 }
-
 
 type Variable struct {
 	Name  []int
@@ -99,6 +101,10 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	case ObjectIdentifier:
 		retVal.Type = ObjectIdentifier
 		retVal.Value, _ = parseObjectIdentifier(data)
+	// IpAddress
+	case IpAddress:
+		retVal.Type = IpAddress
+		retVal.Value = net.IP{data[0], data[1], data[2], data[3]}
 	// Counter32
 	case Counter32:
 		ret, err := parseInt(data)
