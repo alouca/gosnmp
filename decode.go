@@ -149,7 +149,7 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	case NoSuchObject:
 		return nil, fmt.Errorf("No such object")
 	default:
-		err = fmt.Errorf("Unable to decode %x - not implemented", valueType)
+		err = fmt.Errorf("Unable to decode %#v - not implemented", valueType)
 	}
 
 	return
