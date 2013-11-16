@@ -74,7 +74,12 @@ func (x *GoSNMP) Walk(oid string) (results []SnmpPDU, err error) {
 	}
 	results = make([]SnmpPDU, 0)
 	requestOid := oid
-	for res, err := x.GetNext(oid); err == nil; res, err = x.GetNext(oid) {
+
+	for {
+		res, err := x.GetNext(oid)
+		if err != nil {
+			return results, err
+		}
 		if res != nil {
 			if len(res.Variables) > 0 {
 				if strings.Index(res.Variables[0].Name, requestOid) > -1 {
