@@ -138,6 +138,8 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 
 		retVal.Type = Counter64
 		retVal.Value = ret
+	case Null:
+		retVal.Value = nil
 	case Sequence:
 		// NOOP
 		retVal.Value = data
@@ -147,15 +149,18 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	case GetRequest:
 		// NOOP
 		retVal.Value = data
+	case GetBulkRequest:
+		// NOOP
+		retVal.Value = data
 	case NoSuchInstance:
 		return nil, fmt.Errorf("No such instance")
 	case NoSuchObject:
 		return nil, fmt.Errorf("No such object")
 	default:
-		err = fmt.Errorf("Unable to decode %#v - not implemented", valueType)
+		err = fmt.Errorf("Unable to decode %s %#v - not implemented", valueType, valueType)
 	}
 
-	return retVal, nil
+	return retVal, err
 }
 
 // Parses UINT16

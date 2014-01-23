@@ -97,12 +97,13 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 		if err != nil {
 			log.Debug("Unable to parse SNMP PDU: %s\n", err.Error())
 		}
+		response.RequestType = rawPDU.Type
 
 		switch rawPDU.Type {
 		default:
 			log.Debug("Unsupported SNMP Packet Type %s\n", rawPDU.Type.String())
 			log.Debug("PDU Size is %d\n", rawPDU.DataLength)
-		case GetRequest, GetResponse:
+		case GetRequest, GetResponse, GetBulkRequest:
 			log.Debug("SNMP Packet is %s\n", rawPDU.Type.String())
 			log.Debug("PDU Size is %d\n", rawPDU.DataLength)
 			cursor += rawPDU.HeaderLength
