@@ -77,10 +77,14 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 		cursor += rawVersion.DataLength + rawVersion.HeaderLength
 		if version, ok := rawVersion.BERVariable.Value.(int); ok {
 			response.Version = SnmpVersion(version)
+			log.Debug("Parsed Version %d\n", version)
 		}
 
 		// Parse community
 		rawCommunity, err := parseField(packet[cursor:])
+		if err != nil {
+			log.Debug("Unable to parse Community Field: %s\n", err)
+		}
 		cursor += rawCommunity.DataLength + rawCommunity.HeaderLength
 
 		if community, ok := rawCommunity.BERVariable.Value.(string); ok {
@@ -93,10 +97,14 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 		if err != nil {
 			log.Debug("Unable to parse SNMP PDU: %s\n", err.Error())
 		}
+		response.RequestType = rawPDU.Type
 
 		switch rawPDU.Type {
-		case GetResponse:
-			log.Debug("SNMP Packet is GetResponse\n")
+		default:
+			log.Debug("Unsupported SNMP Packet Type %s\n", rawPDU.Type.String())
+			log.Debug("PDU Size is %d\n", rawPDU.DataLength)
+		case GetRequest, GetResponse, GetBulkRequest:
+			log.Debug("SNMP Packet is %s\n", rawPDU.Type.String())
 			log.Debug("PDU Size is %d\n", rawPDU.DataLength)
 			cursor += rawPDU.HeaderLength
 
