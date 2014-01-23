@@ -97,7 +97,7 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	// Octet
 	case OctetString:
 		retVal.Type = OctetString
-		retVal.Value = data
+		retVal.Value = string(data)
 	case ObjectIdentifier:
 		retVal.Type = ObjectIdentifier
 		retVal.Value, _ = parseObjectIdentifier(data)
@@ -144,6 +144,9 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	case GetResponse:
 		// NOOP
 		retVal.Value = data
+	case GetRequest:
+		// NOOP
+		retVal.Value = data
 	case NoSuchInstance:
 		return nil, fmt.Errorf("No such instance")
 	case NoSuchObject:
@@ -152,7 +155,7 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 		err = fmt.Errorf("Unable to decode %#v - not implemented", valueType)
 	}
 
-	return
+	return retVal, nil
 }
 
 // Parses UINT16
