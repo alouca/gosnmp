@@ -151,7 +151,7 @@ func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 		return nil, fmt.Errorf("Error writing to socket: %s\n", err.Error())
 	}
 	// Try to read the response
-	resp := make([]byte, 2048, 2048)
+	resp := make([]byte, 8192, 8192)
 	n, err := x.conn.Read(resp)
 
 	if err != nil {
