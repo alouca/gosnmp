@@ -67,6 +67,35 @@ func (x *GoSNMP) StreamWalk(oid string, c chan *Variable) error {
 	return nil
 }
 
+func (x *GoSNMP) BulkWalk(max_repetitions uint8, oid string) (results []SnmpPDU, err error) {
+	if oid == "" {
+		return nil, fmt.Errorf("No OID given\n")
+	}
+	return x._bulkWalk(max_repetitions, oid, oid)
+}
+func (x *GoSNMP) _bulkWalk(max_repetitions uint8, searching_oid string, root_oid string) (results []SnmpPDU, err error) {
+	response, err := x.GetBulk(0, max_repetitions, searching_oid)
+	if err != nil {
+		return
+	}
+	for i, v := range response.Variables {
+		// is this variable still in the requested oid range
+		if strings.HasPrefix(v.Name, root_oid) {
+			results = append(results, v)
+			// is the last oid received still in the requested range
+			if i == len(response.Variables)-1 {
+				var sub_results []SnmpPDU
+				sub_results, err = x._bulkWalk(max_repetitions, v.Name, root_oid)
+				if err != nil {
+					return
+				}
+				results = append(results, sub_results...)
+			}
+		}
+	}
+	return
+}
+
 // Walk will SNMP walk the target, blocking until the process is complete
 func (x *GoSNMP) Walk(oid string) (results []SnmpPDU, err error) {
 	if oid == "" {
@@ -122,7 +151,7 @@ func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 		return nil, fmt.Errorf("Error writing to socket: %s\n", err.Error())
 	}
 	// Try to read the response
-	resp := make([]byte, 2048, 2048)
+	resp := make([]byte, 8192, 8192)
 	n, err := x.conn.Read(resp)
 
 	if err != nil {
