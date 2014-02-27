@@ -23,15 +23,25 @@ Usage
 The library usage is pretty simple:
 
     // Connect to 192.168.0.1 with timeout of 5 seconds
-    s := gosnmp.NewGoSNMP("192.168.0.1", "public", gosnmp.Version2c, 5)
-    resp, err := s.Get(".1.3.6.1.2.1.1.1.0")
     
-    if err == nil {
-      switch resp.Type {
-        case OctetString:
-          fmt.Printf("Response: %s\n", string(resp.Value))
-      }
-    }
+    import (
+	"github.com/alouca/gosnmp"
+	"log"
+	)
+	
+    s, err := gosnmp.NewGoSNMP("61.147.69.87", "public", gosnmp.Version2c, 5)
+	if err != nil {
+		log.Fatal(err)
+	}
+	resp, err := s.Get(".1.3.6.1.2.1.1.1.0")
+	if err == nil {
+		for _, v := range resp.Variables {
+			switch v.Type {
+			case gosnmp.OctetString:
+				log.Printf("Response: %s : %s : %s \n", v.Name, v.Value.(string), v.Type.String())
+			}
+		}
+	}
 
 The response value is always given as an interface{} depending on the PDU response from the SNMP server. For an example checkout examples/example.go.
 
