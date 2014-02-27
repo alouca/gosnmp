@@ -230,8 +230,6 @@ func (x *GoSNMP) GetBulk(non_repeaters, max_repetitions uint8, oids ...string) (
 	}
 
 	return x.sendPacket(packet)
-
-	return x.sendPacket(packet)
 }
 
 // Sends an SNMP GET request to the target. Returns a Variable with the response or an error
