@@ -35,6 +35,7 @@ const (
 	SetRequest               = 0xa3
 	Trap                     = 0xa4
 	GetBulkRequest           = 0xa5
+	EndOfMibView             = 0x82
 )
 
 // String representations of each SNMP Data Type
@@ -61,6 +62,7 @@ var dataTypeStrings = map[Asn1BER]string{
 	SetRequest:       "SetRequest",
 	Trap:             "Trap",
 	GetBulkRequest:   "GetBulkRequest",
+	EndOfMibView:     "endOfMib",
 }
 
 func (dataType Asn1BER) String() string {
@@ -149,6 +151,9 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	case GetRequest:
 		// NOOP
 		retVal.Value = data
+	case EndOfMibView:
+		retVal.Type = EndOfMibView
+		retVal.Value = "endOfMib"
 	case GetBulkRequest:
 		// NOOP
 		retVal.Value = data
