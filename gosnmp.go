@@ -79,6 +79,9 @@ func (x *GoSNMP) _bulkWalk(max_repetitions uint8, searching_oid string, root_oid
 		return
 	}
 	for i, v := range response.Variables {
+		if v.Value == "endOfMib" {
+			return
+		}
 		// is this variable still in the requested oid range
 		if strings.HasPrefix(v.Name, root_oid) {
 			results = append(results, v)
