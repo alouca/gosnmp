@@ -345,10 +345,11 @@ func marshalPDU(pdu *SnmpPDU) ([]byte, error) {
 }
 
 func oidToString(oid []int) (ret string) {
-	for _, i := range oid {
-		ret = ret + fmt.Sprintf(".%d", i)
+	values := make([]interface{}, len(oid))
+	for i, v := range oid {
+		values[i] = v
 	}
-	return
+	return fmt.Sprintf(strings.Repeat(".%d", len(oid)), values...)
 }
 
 func marshalOID(oid string) ([]byte, error) {
