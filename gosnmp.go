@@ -67,7 +67,7 @@ func (x *GoSNMP) StreamWalk(oid string, c chan SnmpPDU) error {
 		close(c)
 		return fmt.Errorf("No OID given\n")
 	}
-	
+
 	requestOid := oid
 
 	for {
