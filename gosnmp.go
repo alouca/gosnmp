@@ -61,10 +61,42 @@ func (x *GoSNMP) SetTimeout(seconds int64) {
 
 // StreamWalk will start walking a specified OID, and push through a channel the results
 // as it receives them, without waiting for the whole process to finish to return the
-// results
-func (x *GoSNMP) StreamWalk(oid string, c chan *Variable) error {
+// results. Once it has completed the walk, the channel is closed.
+func (x *GoSNMP) StreamWalk(oid string, c chan SnmpPDU) error {
+	if oid == "" {
+		close(c)
+		return fmt.Errorf("No OID given\n")
+	}
+	
+	requestOid := oid
 
-	return nil
+	for {
+		res, err := x.GetNext(oid)
+		if err != nil {
+			close(c)
+			return err
+		}
+		if res != nil {
+			if len(res.Variables) > 0 {
+				if strings.Index(res.Variables[0].Name, requestOid) > -1 {
+					c <- res.Variables[0]
+					// Set to the next
+					oid = res.Variables[0].Name
+					x.Log.Debug("Moving to %s\n", oid)
+				} else {
+					x.Log.Debug("Root OID mismatch, stopping walk\n")
+					break
+				}
+			} else {
+				break
+			}
+		} else {
+			break
+		}
+
+	}
+	close(c)
+	return
 }
 
 func (x *GoSNMP) BulkWalk(max_repetitions uint8, oid string) (results []SnmpPDU, err error) {
