@@ -96,7 +96,7 @@ func (x *GoSNMP) StreamWalk(oid string, c chan SnmpPDU) error {
 
 	}
 	close(c)
-	return
+	return nil
 }
 
 func (x *GoSNMP) BulkWalk(max_repetitions uint8, oid string) (results []SnmpPDU, err error) {
