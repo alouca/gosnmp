@@ -82,6 +82,9 @@ func (x *GoSNMP) StreamWalk(oid string, c chan SnmpPDU) error {
 		if res != nil {
 			if len(res.Variables) > 0 {
 				if strings.Index(res.Variables[0].Name, requestOid) > -1 {
+					if res.Variables[0].Value == "endOfMib" {
+						break
+					}
 					c <- res.Variables[0]
 					// Set to the next
 					oid = res.Variables[0].Name
