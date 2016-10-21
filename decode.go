@@ -108,11 +108,8 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 		retVal.Type = IpAddress
 		retVal.Value = net.IP{data[0], data[1], data[2], data[3]}
 	// Counter32
-	case Counter32:
-		ret, err := parseInt(data)
-		if err != nil {
-			break
-		}
+	case Counter32:		
+		ret := Uvarint(data)
 		retVal.Type = Counter32
 		retVal.Value = ret
 	case TimeTicks:
@@ -124,20 +121,11 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 		retVal.Value = ret
 	// Gauge32
 	case Gauge32:
-		ret, err := parseInt(data)
-		if err != nil {
-			break
-		}
+		ret := Uvarint(data)
 		retVal.Type = Gauge32
 		retVal.Value = ret
 	case Counter64:
-		ret, err := parseInt64(data)
-
-		// Decode it
-		if err != nil {
-			break
-		}
-
+		ret := Uvarint(data)
 		retVal.Type = Counter64
 		retVal.Value = ret
 	case Null:
