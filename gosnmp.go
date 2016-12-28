@@ -7,6 +7,7 @@ package gosnmp
 import (
 	"fmt"
 	l "github.com/alouca/gologger"
+	"math/rand"
 	"net"
 	"strings"
 	"time"
@@ -181,6 +182,9 @@ func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 	deadline := time.Now()
 	x.conn.SetDeadline(deadline.Add(x.Timeout))
 
+	// Create random Request-ID
+	packet.RequestID = uint8(rand.Uint32())
+
 	// Marshal it
 	fBuf, err := packet.marshal()
 
@@ -210,6 +214,11 @@ func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 
 	if len(pdu.Variables) < 1 {
 		return nil, fmt.Errorf("No responses received.")
+	}
+
+	// check Request-ID
+	if pdu.RequestID != packet.RequestID {
+		return nil, fmt.Errorf("Request ID mismatch")
 	}
 
 	return pdu, nil
