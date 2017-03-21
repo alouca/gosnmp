@@ -2,10 +2,12 @@ package gosnmp
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
-	l "github.com/alouca/gologger"
 	"strconv"
 	"strings"
+
+	l "github.com/alouca/gologger"
 )
 
 type SnmpVersion uint8
@@ -28,7 +30,7 @@ type SnmpPacket struct {
 	Version        SnmpVersion
 	Community      string
 	RequestType    Asn1BER
-	RequestID      uint8
+	RequestID      uint32
 	Error          uint8
 	ErrorIndex     uint8
 	NonRepeaters   uint8
@@ -117,7 +119,7 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 
 			cursor += rawRequestId.DataLength + rawRequestId.HeaderLength
 			if requestid, ok := rawRequestId.BERVariable.Value.(int); ok {
-				response.RequestID = uint8(requestid)
+				response.RequestID = uint32(requestid)
 				log.Debug("Parsed Request ID: %d\n", requestid)
 			}
 
@@ -272,7 +274,9 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 	snmpPduBuffer := make([]byte, 0, 1024)
 	snmpPduBuf := bytes.NewBuffer(snmpPduBuffer)
 
-	snmpPduBuf.Write([]byte{byte(packet.RequestType), 0, 2, 1, packet.RequestID})
+	requestIDBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(requestIDBytes, packet.RequestID)
+	snmpPduBuf.Write(append([]byte{byte(packet.RequestType), 0, 2, 4}, requestIDBytes...))
 
 	switch packet.RequestType {
 	case GetBulkRequest:
@@ -302,9 +306,9 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 
 	pduBytes := snmpPduBuf.Bytes()
 	// Varbind list length
-	pduBytes[12] = byte(pduLength)
+	pduBytes[15] = byte(pduLength)
 	// SNMP PDU length (PDU header + varbind list length)
-	pduBytes[1] = byte(pduLength + 11)
+	pduBytes[1] = byte(pduLength + 14)
 
 	buf.Write(pduBytes)
 

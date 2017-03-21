@@ -6,11 +6,12 @@ package gosnmp
 
 import (
 	"fmt"
-	l "github.com/alouca/gologger"
 	"math/rand"
 	"net"
 	"strings"
 	"time"
+
+	l "github.com/alouca/gologger"
 )
 
 // GoSNMP represents the GoSNMP poller structure
@@ -183,7 +184,7 @@ func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 	x.conn.SetDeadline(deadline.Add(x.Timeout))
 
 	// Create random Request-ID
-	packet.RequestID = uint8(rand.Uint32())
+	packet.RequestID = rand.Uint32()
 
 	// Marshal it
 	fBuf, err := packet.marshal()
