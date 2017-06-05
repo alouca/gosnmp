@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -259,17 +260,6 @@ func parseField(data []byte) (*RawBER, error) {
 }
 
 func (packet *SnmpPacket) marshal() ([]byte, error) {
-	// Prepare the buffer to send
-	buffer := make([]byte, 0, 1024)
-	buf := bytes.NewBuffer(buffer)
-
-	// Write the packet header (Message type 0x30) & Version = 2
-	buf.Write([]byte{byte(Sequence), 0, 2, 1, byte(packet.Version)})
-
-	// Write Community
-	buf.Write([]byte{4, uint8(len(packet.Community))})
-	buf.WriteString(packet.Community)
-
 	// Marshal the SNMP PDU
 	snmpPduBuffer := make([]byte, 0, 1024)
 	snmpPduBuf := bytes.NewBuffer(snmpPduBuffer)
@@ -310,6 +300,46 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 	// SNMP PDU length (PDU header + varbind list length)
 	pduBytes[1] = byte(pduLength + 14)
 
+	// Prepare the buffer to send
+	buffer := make([]byte, 0, 1024)
+	buf := bytes.NewBuffer(buffer)
+
+	// Write the message type 0x30
+	buf.Write([]byte{byte(Sequence)})
+
+	// Find the size of the whole data
+	// The extra 5 bytes are snmp verion (3 bytes) + community string type and
+	// community string length
+	dataLength := len(pduBytes) + len(packet.Community) + 5
+
+	// If the data is 128 bytes or larger then we need to use 2 or more bytes
+	// to represent the length
+	if dataLength >= 128 {
+		// Work out how many bytes we require
+		bytesNeeded := int(math.Ceil(math.Log2(float64(dataLength)) / 8))
+		// Set the most significant bit to 1 to show we are using the long for,
+		// then the 7 least significant bits to show how many bytes will be used
+		// to represent the length
+		lengthIdentifier := 128 + bytesNeeded
+		buf.Write([]byte{uint8(lengthIdentifier)})
+		lengthBytes := make([]byte, bytesNeeded)
+		for i := bytesNeeded; i >= 1; i-- {
+			lengthBytes[i-1] = uint8(dataLength % 256)
+			dataLength = dataLength >> 8
+		}
+		buf.Write(lengthBytes)
+	} else {
+		buf.Write([]byte{uint8(dataLength)})
+	}
+
+	// Write the Version
+	buf.Write([]byte{2, 1, byte(packet.Version)})
+
+	// Write Community
+	buf.Write([]byte{4, uint8(len(packet.Community))})
+	buf.WriteString(packet.Community)
+
+	// Write the PDU
 	buf.Write(pduBytes)
 
 	// Write the
@@ -317,12 +347,7 @@ func (packet *SnmpPacket) marshal() ([]byte, error) {
 	//buf.Write(mOid)
 	//buf.Write([]byte{5, 0})
 
-	ret := buf.Bytes()
-
-	// Set the packet size
-	ret[1] = uint8(len(ret) - 2)
-
-	return ret, nil
+	return buf.Bytes(), nil
 }
 
 func marshalPDU(pdu *SnmpPDU) ([]byte, error) {
