@@ -306,3 +306,28 @@ func (x *GoSNMP) GetMulti(oids []string) (*SnmpPacket, error) {
 
 	return x.sendPacket(packet)
 }
+
+func (x *GoSNMP) BulkWalk(non_repeaters, max_repetitions uint8, oid string) (results []SnmpPDU, err error) {
+	if oid == "" {
+		return nil, fmt.Errorf("No oid given\n")
+	}
+	results = make([]SnmpPDU, 0)
+	requestOid := oid
+	status := true
+	for status {
+		res, err := x.GetBulk(0, 25, oid)
+		if err != nil {
+			return nil, err
+		}
+		for _, v := range res.Variables {
+			if strings.Index(v.Name, requestOid) > -1 {
+				results = append(results, v)
+				oid = v.Name
+				continue
+			}
+			status = false
+			break
+		}
+	}
+	return
+}
