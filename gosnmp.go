@@ -228,17 +228,7 @@ func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 // GetNext sends an SNMP Get Next Request to the target. Returns the next
 // variable response from the OID given or an error
 func (x *GoSNMP) GetNext(oid string) (*SnmpPacket, error) {
-	// Create the packet
-	packet := new(SnmpPacket)
-
-	packet.Community = x.Community
-	packet.Error = 0
-	packet.ErrorIndex = 0
-	packet.RequestType = GetNextRequest
-	packet.Version = 1 // version 2
-	packet.Variables = []SnmpPDU{SnmpPDU{Name: oid, Type: Null}}
-
-	return x.sendPacket(packet)
+	return x.request(GetNextRequest, oid)
 }
 
 // Debug function. Unmarshals raw bytes and returns the result without the network part
@@ -254,55 +244,43 @@ func (x *GoSNMP) Debug(data []byte) (*SnmpPacket, error) {
 // GetBulk sends an SNMP BULK-GET request to the target. Returns a Variable with
 // the response or an error
 func (x *GoSNMP) GetBulk(nonRepeaters, maxRepetitions uint8, oids ...string) (*SnmpPacket, error) {
-	// Create the packet
-	packet := new(SnmpPacket)
-
-	packet.Community = x.Community
-	packet.NonRepeaters = nonRepeaters
-	packet.MaxRepetitions = maxRepetitions
-	packet.RequestType = GetBulkRequest
-	packet.Version = 1 // version 2
-	packet.Variables = make([]SnmpPDU, len(oids))
-
-	for i, oid := range oids {
-		packet.Variables[i] = SnmpPDU{Name: oid, Type: Null}
-	}
-
-	return x.sendPacket(packet)
+	// Create and send the packet
+	return x.sendPacket(&SnmpPacket{
+		Version:        x.Version,
+		Community:      x.Community,
+		RequestType:    GetBulkRequest,
+		NonRepeaters:   nonRepeaters,
+		MaxRepetitions: maxRepetitions,
+		Variables:      oidsToPbus(oids...),
+	})
 }
 
 // Get sends an SNMP GET request to the target. Returns a Variable with the
 // response or an error
 func (x *GoSNMP) Get(oid string) (*SnmpPacket, error) {
-	// Create the packet
-	packet := new(SnmpPacket)
-
-	packet.Community = x.Community
-	packet.Error = 0
-	packet.ErrorIndex = 0
-	packet.RequestType = GetRequest
-	packet.Version = 1 // version 2
-	packet.Variables = []SnmpPDU{SnmpPDU{Name: oid, Type: Null}}
-
-	return x.sendPacket(packet)
+	return x.request(GetRequest, oid)
 }
 
 // GetMulti sends an SNMP GET request to the target. Returns a Variable with the
 // response or an error
 func (x *GoSNMP) GetMulti(oids []string) (*SnmpPacket, error) {
-	// Create the packet
-	packet := new(SnmpPacket)
+	return x.request(GetRequest, oids...)
+}
 
-	packet.Community = x.Community
-	packet.Error = 0
-	packet.ErrorIndex = 0
-	packet.RequestType = GetRequest
-	packet.Version = 1 // version 2
-	packet.Variables = make([]SnmpPDU, len(oids))
+func (x *GoSNMP) request(requestType Asn1BER, oids ...string) (*SnmpPacket, error) {
+	// Create and send the packet
+	return x.sendPacket(&SnmpPacket{
+		Version:     x.Version,
+		Community:   x.Community,
+		RequestType: requestType,
+		Variables:   oidsToPbus(oids...),
+	})
+}
 
+func oidsToPbus(oids ...string) []SnmpPDU {
+	pdus := make([]SnmpPDU, len(oids))
 	for i, oid := range oids {
-		packet.Variables[i] = SnmpPDU{Name: oid, Type: Null}
+		pdus[i] = SnmpPDU{Name: oid, Type: Null}
 	}
-
-	return x.sendPacket(packet)
+	return pdus
 }
