@@ -28,8 +28,6 @@ func BenchmarkUnmarshal(t *testing.B) {
 func TestDecode(t *testing.T) {
 	t.Log("Running Decode Test\n")
 	s, _ := NewGoSNMP("", "", Version2c, 5)
-	s.SetDebug(true)
-	s.SetVerbose(true)
 
 	for _, p := range TestPackets {
 		packet, err := hex.DecodeString(p)
@@ -54,8 +52,6 @@ func TestDecode(t *testing.T) {
 func TestWalk(t *testing.T) {
 	t.Log("Running walk test")
 	s, _ := NewGoSNMP("sample", "demo", Version2c, 5)
-	s.SetDebug(true)
-	s.SetVerbose(true)
 	res, err := s.Walk(".1.3.6.1.2.1.2")
 
 	if err != nil {

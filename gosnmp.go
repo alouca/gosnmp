@@ -10,8 +10,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	l "github.com/alouca/gologger"
 )
 
 // GoSNMP represents the GoSNMP poller structure
@@ -21,7 +19,6 @@ type GoSNMP struct {
 	Version   SnmpVersion
 	Timeout   time.Duration
 	conn      net.Conn
-	Log       *l.Logger
 }
 
 // DefaultPort is the default SNMP port
@@ -41,19 +38,9 @@ func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*G
 	if err != nil {
 		return nil, fmt.Errorf("Error establishing connection to host: %s\n", err.Error())
 	}
-	s := &GoSNMP{target, community, version, time.Duration(timeout) * time.Second, conn, l.CreateLogger(false, false)}
+	s := &GoSNMP{target, community, version, time.Duration(timeout) * time.Second, conn}
 
 	return s, nil
-}
-
-// SetVerbose enables verbose logging
-func (x *GoSNMP) SetVerbose(v bool) {
-	x.Log.VerboseFlag = v
-}
-
-// SetDebug enables debugging
-func (x *GoSNMP) SetDebug(d bool) {
-	x.Log.DebugFlag = d
 }
 
 // SetTimeout sets the timeout for network read/write functions. Defaults to 5 seconds.
@@ -90,9 +77,7 @@ func (x *GoSNMP) StreamWalk(oid string, c chan SnmpPDU) error {
 					c <- res.Variables[0]
 					// Set to the next
 					oid = res.Variables[0].Name
-					x.Log.Debug("Moving to %s\n", oid)
 				} else {
-					x.Log.Debug("Root OID mismatch, stopping walk\n")
 					break
 				}
 			} else {
@@ -160,9 +145,7 @@ func (x *GoSNMP) Walk(oid string) (results []SnmpPDU, err error) {
 					results = append(results, res.Variables[0])
 					// Set to the next
 					oid = res.Variables[0].Name
-					x.Log.Debug("Moving to %s\n", oid)
 				} else {
-					x.Log.Debug("Root OID mismatch, stopping walk\n")
 					break
 				}
 			} else {
