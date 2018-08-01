@@ -1,4 +1,4 @@
-package gosnmp
+package go_snmp
 
 import (
 	"bytes"

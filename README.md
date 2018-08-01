@@ -26,7 +26,7 @@ The library usage is pretty simple:
 // Connect to 192.168.0.1 with timeout of 5 seconds
 
 import (
-	"github.com/alouca/gosnmp"
+	go-snmp
 	"log"
 )
 

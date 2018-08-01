@@ -2,7 +2,7 @@
 // Use of this source code is goverend by a BSD-style
 // license that can be found in the LICENSE file.
 
-package gosnmp
+package go_snmp
 
 import (
 	"fmt"
