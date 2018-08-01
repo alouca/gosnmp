@@ -6,6 +6,7 @@ package gosnmp
 
 import (
 	"fmt"
+	"errors"
 	"net"
 )
 
@@ -80,76 +81,85 @@ type Variable struct {
 	Value interface{}
 }
 
-func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
-	retVal = new(Variable)
-	retVal.Size = uint64(len(data))
-	switch Asn1BER(valueType) {
+func decodeValue(valueType Asn1BER, data []byte) (*Variable, error) {
+	v := &Variable{Size: uint64(len(data))}
+	switch valueType {
 	case Integer:
 		ret, err := parseInt(data)
 		if err != nil {
 			break
 		}
-		retVal.Type = Integer
-		retVal.Value = ret
+		v.Type = Integer
+		v.Value = ret
 	case OctetString:
-		retVal.Type = OctetString
-		retVal.Value = string(data)
+		v.Type = OctetString
+		v.Value = string(data)
 	case ObjectIdentifier:
-		retVal.Type = ObjectIdentifier
-		retVal.Value, _ = parseObjectIdentifier(data)
+		v.Type = ObjectIdentifier
+		v.Value, _ = parseObjectIdentifier(data)
 	case IpAddress:
-		retVal.Type = IpAddress
-		retVal.Value = net.IP{data[0], data[1], data[2], data[3]}
+		v.Type = IpAddress
+		v.Value = net.IP(data)
 	case Counter32:
-		ret := Uvarint(data)
-		retVal.Type = Counter32
-		retVal.Value = ret
+		v.Type = Counter32
+		v.Value = Uvarint(data)
 	case TimeTicks:
 		ret, err := parseInt(data)
 		if err != nil {
 			break
 		}
-		retVal.Type = TimeTicks
-		retVal.Value = ret
+		v.Type = TimeTicks
+		v.Value = ret
 	case Gauge32:
-		ret := Uvarint(data)
-		retVal.Type = Gauge32
-		retVal.Value = ret
+		v.Type = Gauge32
+		v.Value = Uvarint(data)
 	case Counter64:
-		ret := Uvarint(data)
-		retVal.Type = Counter64
-		retVal.Value = ret
+		v.Type = Counter64
+		v.Value = Uvarint(data)
 	case Null:
-		retVal.Value = nil
+		v.Value = nil
 	case Sequence:
 		// NOOP
-		retVal.Value = data
+		v.Value = data
 	case GetResponse:
 		// NOOP
-		retVal.Value = data
+		v.Value = data
 	case GetRequest:
 		// NOOP
-		retVal.Value = data
+		v.Value = data
 	case EndOfMibView:
-		retVal.Type = EndOfMibView
-		retVal.Value = "endOfMib"
+		v.Type = EndOfMibView
+		v.Value = "endOfMib"
 	case GetBulkRequest:
 		// NOOP
-		retVal.Value = data
+		v.Value = data
 	case NoSuchInstance:
 		return nil, fmt.Errorf("no such instance")
 	case NoSuchObject:
 		return nil, fmt.Errorf("no such object")
 	default:
-		err = fmt.Errorf("unable to decode %s %#v - not implemented", valueType, valueType)
+		return nil, fmt.Errorf("unable to decode %s %#v - not implemented", valueType, valueType)
 	}
-	return retVal, err
+	return v, nil
 }
 
-// Parses UINT16
-func ParseUint16(content []byte) int {
-	number := uint8(content[1]) | uint8(content[0])<<8
-	//fmt.Printf("\t%d\n", number)
-
-	return int(number)
+// parseInt treats the given bytes as a big-endian, signed integer and returns
+// the result.
+func parseInt(bytes []byte) (int, error) {
+	res, err := parseInt64(bytes)
+	if err != nil {
+		return 0, err
+	}
+	if res != int64(int(res)) {
+		return 0, errors.New("integer too large")
+	}
+	return int(res), nil
 }
+
+//// Parses UINT16
+//func ParseUint16(content []byte) int {
+//	number := uint8(content[1]) | uint8(content[0])<<8
+//	//fmt.Printf("\t%d\n", number)
+//
+//	return int(number)
+//}

@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// DefaultPort is the default SNMP port
+var DefaultPort = 161
+
 // GoSNMP represents the GoSNMP poller structure
 type GoSNMP struct {
 	Target    string
@@ -20,9 +23,6 @@ type GoSNMP struct {
 	Timeout   time.Duration
 	conn      net.Conn
 }
-
-// DefaultPort is the default SNMP port
-var DefaultPort = 161
 
 // NewGoSNMP creates a new SNMP Client. Target is the IP address, Community
 // the SNMP Community String and Version the SNMP version. Currently only v2c
@@ -34,12 +34,10 @@ func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*G
 
 	// Open a UDP connection to the target
 	conn, err := net.DialTimeout("udp", target, time.Duration(timeout)*time.Second)
-
 	if err != nil {
 		return nil, fmt.Errorf("Error establishing connection to host: %s\n", err.Error())
 	}
 	s := &GoSNMP{target, community, version, time.Duration(timeout) * time.Second, conn}
-
 	return s, nil
 }
 
@@ -59,34 +57,28 @@ func (x *GoSNMP) StreamWalk(oid string, c chan SnmpPDU) error {
 		close(c)
 		return fmt.Errorf("No OID given\n")
 	}
-
 	requestOid := oid
-
 	for {
 		res, err := x.GetNext(oid)
 		if err != nil {
 			close(c)
 			return err
 		}
-		if res != nil {
-			if len(res.Variables) > 0 {
-				if strings.Index(res.Variables[0].Name, requestOid) > -1 {
-					if res.Variables[0].Value == "endOfMib" {
-						break
-					}
-					c <- res.Variables[0]
-					// Set to the next
-					oid = res.Variables[0].Name
-				} else {
-					break
-				}
-			} else {
-				break
-			}
-		} else {
+		if res == nil {
 			break
 		}
-
+		if len(res.Variables) <= 0 {
+			break
+		}
+		if strings.Index(res.Variables[0].Name, requestOid) <= -1 {
+			break
+		}
+		if res.Variables[0].Value == "endOfMib" {
+			break
+		}
+		c <- res.Variables[0]
+		// Set to the next
+		oid = res.Variables[0].Name
 	}
 	close(c)
 	return nil
@@ -94,20 +86,22 @@ func (x *GoSNMP) StreamWalk(oid string, c chan SnmpPDU) error {
 
 // BulkWalk sends an walks the target using SNMP BULK-GET requests. This returns
 // a Variable with the response and the error condition
-func (x *GoSNMP) BulkWalk(maxRepetitions uint8, oid string) (results []SnmpPDU, err error) {
+func (x *GoSNMP) BulkWalk(maxRepetitions uint8, oid string) ([]SnmpPDU, error) {
 	if oid == "" {
 		return nil, fmt.Errorf("No OID given\n")
 	}
-	return x._bulkWalk(maxRepetitions, oid, oid)
+	return x.bulkWalk(maxRepetitions, oid, oid)
 }
-func (x *GoSNMP) _bulkWalk(maxRepetitions uint8, searchingOid string, rootOid string) (results []SnmpPDU, err error) {
+
+func (x *GoSNMP) bulkWalk(maxRepetitions uint8, searchingOid string, rootOid string) ([]SnmpPDU, error) {
 	response, err := x.GetBulk(0, maxRepetitions, searchingOid)
 	if err != nil {
-		return
+		return nil, err
 	}
+	var results []SnmpPDU
 	for i, v := range response.Variables {
 		if v.Value == "endOfMib" {
-			return
+			return nil, nil
 		}
 		// is this variable still in the requested oid range
 		if strings.HasPrefix(v.Name, rootOid) {
@@ -115,48 +109,43 @@ func (x *GoSNMP) _bulkWalk(maxRepetitions uint8, searchingOid string, rootOid st
 			// is the last oid received still in the requested range
 			if i == len(response.Variables)-1 {
 				var subResults []SnmpPDU
-				subResults, err = x._bulkWalk(maxRepetitions, v.Name, rootOid)
+				subResults, err = x.bulkWalk(maxRepetitions, v.Name, rootOid)
 				if err != nil {
-					return
+					return nil, err
 				}
 				results = append(results, subResults...)
 			}
 		}
 	}
-	return
+	return results, nil
 }
 
 // Walk will SNMP walk the target, blocking until the process is complete
-func (x *GoSNMP) Walk(oid string) (results []SnmpPDU, err error) {
+func (x *GoSNMP) Walk(oid string) ([]SnmpPDU, error) {
 	if oid == "" {
 		return nil, fmt.Errorf("No OID given\n")
 	}
-	results = make([]SnmpPDU, 0)
+	results := make([]SnmpPDU, 0)
 	requestOid := oid
-
 	for {
 		res, err := x.GetNext(oid)
 		if err != nil {
 			return results, err
 		}
-		if res != nil {
-			if len(res.Variables) > 0 {
-				if strings.Index(res.Variables[0].Name, requestOid) > -1 {
-					results = append(results, res.Variables[0])
-					// Set to the next
-					oid = res.Variables[0].Name
-				} else {
-					break
-				}
-			} else {
-				break
-			}
-		} else {
+		if res == nil {
 			break
 		}
-
+		if len(res.Variables) <= 0 {
+			break
+		}
+		if strings.Index(res.Variables[0].Name, requestOid) <= -1 {
+			break
+		}
+		results = append(results, res.Variables[0])
+		// Set to the next
+		oid = res.Variables[0].Name
 	}
-	return
+	return results, nil
 }
 
 // sendPacket marshals & send an SNMP request. Unmarshals the response and
