@@ -22,7 +22,7 @@ var (
 func init() {
 	flag.StringVar(&cmdDebug, "debug", "", "Debug flag expects byte array of raw packet to test decoding")
 
-	flag.StringVar(&cmdTarget, "target", "", "Target SNMP Agent")
+	flag.StringVar(&cmdTarget, "target", "", "Host SNMP Agent")
 	flag.StringVar(&cmdCommunity, "community", "public", "SNNP Community")
 	flag.StringVar(&cmdOid, "oid", "", "The request OID. Multiple OIDs can be separated by a comma")
 	flag.Int64Var(&cmdTimeout, "timeout", 5, "Set the timeout in seconds")

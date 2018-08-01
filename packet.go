@@ -1,4 +1,4 @@
-package gosnmp
+package go_snmp
 
 import (
 	"bytes"
@@ -65,7 +65,7 @@ func Unmarshal(packet []byte) (*SnmpPacket, error) {
 		rawVersion, err := parseField(packet[cursor:])
 
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing SNMP packet version: %s", err.Error())
+			return nil, fmt.Errorf("error parsing SNMP packet version: %v", err)
 		}
 
 		cursor += rawVersion.DataLength + rawVersion.HeaderLength
@@ -191,7 +191,7 @@ func parseField(data []byte) (*RawBER, error) {
 	var err error
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf("Unable to parse BER: Data length 0")
+		return nil, fmt.Errorf("unable to parse BER: Data length 0")
 	}
 
 	ber := new(RawBER)
@@ -214,7 +214,7 @@ func parseField(data []byte) (*RawBER, error) {
 
 	// Do sanity checks
 	if ber.DataLength > uint64(len(data)) {
-		return nil, fmt.Errorf("Unable to parse BER: provided data length is longer than actual data (%d vs %d)", ber.DataLength, len(data))
+		return nil, fmt.Errorf("unable to parse BER: provided data length is longer than actual data (%d > %d)", ber.DataLength, len(data))
 	}
 
 	ber.Data = data[ber.HeaderLength : ber.HeaderLength+ber.DataLength]
@@ -222,7 +222,7 @@ func parseField(data []byte) (*RawBER, error) {
 	ber.BERVariable, err = decodeValue(ber.Type, ber.Data)
 
 	if err != nil {
-		return nil, fmt.Errorf("Unable to decode value: %s\n", err.Error())
+		return nil, fmt.Errorf("unable to decode value: %v", err)
 	}
 
 	return ber, nil
@@ -336,7 +336,7 @@ func marshalPDU(pdu *SnmpPDU) ([]byte, error) {
 		pduBuf.Write(oid)
 		pduBuf.Write([]byte{Null, 0x00})
 	default:
-		return nil, fmt.Errorf("Unable to marshal PDU: unknown BER type %d", pdu.Type)
+		return nil, fmt.Errorf("unable to marshal PDU: unknown BER type %d", pdu.Type)
 	}
 
 	return pduBuf.Bytes(), nil
