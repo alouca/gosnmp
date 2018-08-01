@@ -67,11 +67,9 @@ var dataTypeStrings = map[Asn1BER]string{
 
 func (dataType Asn1BER) String() string {
 	str, ok := dataTypeStrings[dataType]
-
 	if !ok {
 		str = "Unknown"
 	}
-
 	return str
 }
 
@@ -85,10 +83,7 @@ type Variable struct {
 func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 	retVal = new(Variable)
 	retVal.Size = uint64(len(data))
-
 	switch Asn1BER(valueType) {
-
-	// Integer
 	case Integer:
 		ret, err := parseInt(data)
 		if err != nil {
@@ -96,19 +91,16 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 		}
 		retVal.Type = Integer
 		retVal.Value = ret
-	// Octet
 	case OctetString:
 		retVal.Type = OctetString
 		retVal.Value = string(data)
 	case ObjectIdentifier:
 		retVal.Type = ObjectIdentifier
 		retVal.Value, _ = parseObjectIdentifier(data)
-	// IpAddress
 	case IpAddress:
 		retVal.Type = IpAddress
 		retVal.Value = net.IP{data[0], data[1], data[2], data[3]}
-	// Counter32
-	case Counter32:		
+	case Counter32:
 		ret := Uvarint(data)
 		retVal.Type = Counter32
 		retVal.Value = ret
@@ -119,7 +111,6 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 		}
 		retVal.Type = TimeTicks
 		retVal.Value = ret
-	// Gauge32
 	case Gauge32:
 		ret := Uvarint(data)
 		retVal.Type = Gauge32
@@ -146,13 +137,12 @@ func decodeValue(valueType Asn1BER, data []byte) (retVal *Variable, err error) {
 		// NOOP
 		retVal.Value = data
 	case NoSuchInstance:
-		return nil, fmt.Errorf("No such instance")
+		return nil, fmt.Errorf("no such instance")
 	case NoSuchObject:
-		return nil, fmt.Errorf("No such object")
+		return nil, fmt.Errorf("no such object")
 	default:
-		err = fmt.Errorf("Unable to decode %s %#v - not implemented", valueType, valueType)
+		err = fmt.Errorf("unable to decode %s %#v - not implemented", valueType, valueType)
 	}
-
 	return retVal, err
 }
 
