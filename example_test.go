@@ -16,13 +16,13 @@ func ExampleClient_Get() {
 	defer client.Close()
 
 	// Get the client's sysDescr.0 OID.
-	res, err := client.Get("1.3.6.1.2.1.1.1.0")
+	resp, err := client.Get("1.3.6.1.2.1.1.1.0")
 	if err != nil {
 		log.Fatalf("failed to get oid: %v", err)
 	}
 
 	// Loop through the response variables.
-	for _, v := range res.Variables {
+	for _, v := range resp.Variables {
 		// Handle the SNMP types you expect.
 		switch v.Type {
 		case snmp.OctetString:
