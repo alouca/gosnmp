@@ -1,4 +1,4 @@
-package go_snmp
+package gosnmp
 
 import (
 	"encoding/hex"

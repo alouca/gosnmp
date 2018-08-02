@@ -1,4 +1,4 @@
-package go_snmp_test
+package gosnmp_test
 
 import (
 	"fmt"
