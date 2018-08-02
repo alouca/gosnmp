@@ -19,29 +19,33 @@ func BenchmarkUnmarshal(t *testing.B) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s, err := NewClient("", "", Version2c, 5)
+		client, err := NewClient("", "", Version2c, 5)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for i := 0; i < t.N; i++ {
-			if _, err := s.Debug(packet); err != nil {
+			if _, err := client.Debug(packet); err != nil {
+				client.Close()
 				t.Fatal(err)
 			}
 		}
+		client.Close()
 	}
 }
 
 func TestDecode(t *testing.T) {
-	s, err := NewClient("", "", Version2c, 5)
+	client, err := NewClient("", "", Version2c, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
+
 	for _, tp := range testPackets {
 		packet, err := hex.DecodeString(tp)
 		if err != nil {
 			t.Fatalf("Unable to decode raw packet: %s\n", err.Error())
 		}
-		pckt, err := s.Debug(packet)
+		pckt, err := client.Debug(packet)
 		if err != nil {
 			t.Errorf("Error while debugging: %s\n", err.Error())
 		}
@@ -52,12 +56,15 @@ func TestDecode(t *testing.T) {
 }
 
 func TestWalk(t *testing.T) {
-	t.Skipf("skipping test: fails because host 'sample' does not exist")
-	s, err := NewClient("sample", "demo", Version2c, 5)
+	t.Skipf("skipping test walk: fails because host 'sample' does not exist")
+
+	client, err := NewClient("sample", "demo", Version2c, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := s.Walk(".1.3.6.1.2.1.2")
+	defer client.Close()
+
+	res, err := client.Walk(".1.3.6.1.2.1.2")
 	if err != nil {
 		t.Fatalf("Unable to perform walk: %s\n", err.Error())
 	}
@@ -70,9 +77,11 @@ func TestWalk(t *testing.T) {
 func TestConnect(t *testing.T) {
 	targets := []string{"localhost", "localhost:161"}
 	for _, target := range targets {
-		if _, err := NewClient(target, "public", Version2c, 5); err != nil {
+		client, err := NewClient(target, "public", Version2c, 5)
+		if err != nil {
 			t.Fatalf("Unable to connect to %s: %s\n", target, err)
 		}
+		client.Close()
 	}
 }
 
