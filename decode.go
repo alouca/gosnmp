@@ -2,7 +2,7 @@
 // Use of this source code is goverend by a BSD-style
 // license that can be found in the LICENSE file.
 
-package go_snmp
+package gosnmp
 
 import (
 	"fmt"
@@ -155,11 +155,3 @@ func parseInt(bytes []byte) (int, error) {
 	}
 	return int(res), nil
 }
-
-//// Parses UINT16
-//func ParseUint16(content []byte) int {
-//	number := uint8(content[1]) | uint8(content[0])<<8
-//	//fmt.Printf("\t%d\n", number)
-//
-//	return int(number)
-//}
