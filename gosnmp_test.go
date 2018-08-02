@@ -51,19 +51,20 @@ func TestDecode(t *testing.T) {
 	}
 }
 
-//func TestWalk(t *testing.T) {
-//	s, err := NewClient("sample", "demo", Version2c, 5)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	res, err := s.Walk(".1.3.6.1.2.1.2")
-//	if err != nil {
-//		t.Fatalf("Unable to perform walk: %s\n", err.Error())
-//	}
-//	for i, r := range res {
-//		t.Logf("%d: %s -> %v", i, r.Name, r.Value)
-//	}
-//}
+func TestWalk(t *testing.T) {
+	t.Skipf("skipping test: fails because host 'sample' does not exist")
+	s, err := NewClient("sample", "demo", Version2c, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.Walk(".1.3.6.1.2.1.2")
+	if err != nil {
+		t.Fatalf("Unable to perform walk: %s\n", err.Error())
+	}
+	for i, r := range res {
+		t.Logf("%d: %s -> %v", i, r.Name, r.Value)
+	}
+}
 
 // Test SNMP connections with different ports
 func TestConnect(t *testing.T) {

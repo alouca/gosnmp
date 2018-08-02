@@ -155,11 +155,3 @@ func parseInt(bytes []byte) (int, error) {
 	}
 	return int(res), nil
 }
-
-//// Parses UINT16
-//func ParseUint16(content []byte) int {
-//	number := uint8(content[1]) | uint8(content[0])<<8
-//	//fmt.Printf("\t%d\n", number)
-//
-//	return int(number)
-//}
