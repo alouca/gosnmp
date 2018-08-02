@@ -10,119 +10,102 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	l "github.com/alouca/gologger"
 )
 
-// GoSNMP represents the GoSNMP poller structure
-type GoSNMP struct {
-	Target    string
+// Client represents the SNMP client
+type Client struct {
+	Host      string
 	Community string
 	Version   SnmpVersion
 	Timeout   time.Duration
 	conn      net.Conn
-	Log       *l.Logger
 }
 
-// DefaultPort is the default SNMP port
-var DefaultPort = 161
-
-// NewGoSNMP creates a new SNMP Client. Target is the IP address, Community
+// NewClient creates a new SNMP client. Host is the IP address, Community
 // the SNMP Community String and Version the SNMP version. Currently only v2c
 // is supported. Timeout parameter is measured in seconds.
-func NewGoSNMP(target, community string, version SnmpVersion, timeout int64) (*GoSNMP, error) {
-	if !strings.Contains(target, ":") {
-		target = fmt.Sprintf("%s:%d", target, DefaultPort)
+func NewClient(host, community string, version SnmpVersion, timeout int64) (*Client, error) {
+	if !strings.Contains(host, ":") {
+		host = net.JoinHostPort(host, "161")
 	}
-
-	// Open a UDP connection to the target
-	conn, err := net.DialTimeout("udp", target, time.Duration(timeout)*time.Second)
-
+	conn, err := net.DialTimeout("udp", host, time.Duration(timeout)*time.Second)
 	if err != nil {
-		return nil, fmt.Errorf("Error establishing connection to host: %s\n", err.Error())
+		return nil, fmt.Errorf("error establishing connection to host: %s\n", err.Error())
 	}
-	s := &GoSNMP{target, community, version, time.Duration(timeout) * time.Second, conn, l.CreateLogger(false, false)}
-
+	s := &Client{
+		Host:      host,
+		Community: community,
+		Version:   version,
+		Timeout:   time.Duration(timeout) * time.Second,
+		conn:      conn,
+	}
 	return s, nil
 }
 
-// SetVerbose enables verbose logging
-func (x *GoSNMP) SetVerbose(v bool) {
-	x.Log.VerboseFlag = v
-}
-
-// SetDebug enables debugging
-func (x *GoSNMP) SetDebug(d bool) {
-	x.Log.DebugFlag = d
+// Close closes the UDP client connection.
+func (c *Client) Close() error {
+	return c.conn.Close()
 }
 
 // SetTimeout sets the timeout for network read/write functions. Defaults to 5 seconds.
-func (x *GoSNMP) SetTimeout(seconds int64) {
+func (c *Client) SetTimeout(seconds int64) {
 	if seconds <= 0 {
 		seconds = 5
 	}
-	x.Timeout = time.Duration(seconds) * time.Second
+	c.Timeout = time.Duration(seconds) * time.Second
 }
 
 // StreamWalk will start walking a specified OID, and push through a channel the results
 // as it receives them, without waiting for the whole process to finish to return the
 // results. Once it has completed the walk, the channel is closed.
-func (x *GoSNMP) StreamWalk(oid string, c chan SnmpPDU) error {
+func (c *Client) StreamWalk(oid string, pdus chan SnmpPDU) error {
+	defer close(pdus)
+
 	if oid == "" {
-		close(c)
-		return fmt.Errorf("No OID given\n")
+		return fmt.Errorf("no OID given")
 	}
-
-	requestOid := oid
-
 	for {
-		res, err := x.GetNext(oid)
+		res, err := c.GetNext(oid)
 		if err != nil {
-			close(c)
 			return err
 		}
-		if res != nil {
-			if len(res.Variables) > 0 {
-				if strings.Index(res.Variables[0].Name, requestOid) > -1 {
-					if res.Variables[0].Value == "endOfMib" {
-						break
-					}
-					c <- res.Variables[0]
-					// Set to the next
-					oid = res.Variables[0].Name
-					x.Log.Debug("Moving to %s\n", oid)
-				} else {
-					x.Log.Debug("Root OID mismatch, stopping walk\n")
-					break
-				}
-			} else {
-				break
-			}
-		} else {
+		if res == nil {
 			break
 		}
-
+		if len(res.Variables) <= 0 {
+			break
+		}
+		if strings.Index(res.Variables[0].Name, oid) <= -1 {
+			break
+		}
+		if res.Variables[0].Value == "endOfMib" {
+			break
+		}
+		pdus <- res.Variables[0]
+		// Set to the next
+		oid = res.Variables[0].Name
 	}
-	close(c)
 	return nil
 }
 
 // BulkWalk sends an walks the target using SNMP BULK-GET requests. This returns
 // a Variable with the response and the error condition
-func (x *GoSNMP) BulkWalk(maxRepetitions uint8, oid string) (results []SnmpPDU, err error) {
+func (c *Client) BulkWalk(maxRepetitions uint8, oid string) ([]SnmpPDU, error) {
 	if oid == "" {
-		return nil, fmt.Errorf("No OID given\n")
+		return nil, fmt.Errorf("no OID given")
 	}
-	return x._bulkWalk(maxRepetitions, oid, oid)
+	return c.bulkWalk(maxRepetitions, oid, oid)
 }
-func (x *GoSNMP) _bulkWalk(maxRepetitions uint8, searchingOid string, rootOid string) (results []SnmpPDU, err error) {
-	response, err := x.GetBulk(0, maxRepetitions, searchingOid)
+
+func (c *Client) bulkWalk(maxRepetitions uint8, searchingOid string, rootOid string) ([]SnmpPDU, error) {
+	response, err := c.GetBulk(0, maxRepetitions, searchingOid)
 	if err != nil {
-		return
+		return nil, err
 	}
+	var results []SnmpPDU
 	for i, v := range response.Variables {
 		if v.Value == "endOfMib" {
-			return
+			return nil, nil
 		}
 		// is this variable still in the requested oid range
 		if strings.HasPrefix(v.Name, rootOid) {
@@ -130,58 +113,51 @@ func (x *GoSNMP) _bulkWalk(maxRepetitions uint8, searchingOid string, rootOid st
 			// is the last oid received still in the requested range
 			if i == len(response.Variables)-1 {
 				var subResults []SnmpPDU
-				subResults, err = x._bulkWalk(maxRepetitions, v.Name, rootOid)
+				subResults, err = c.bulkWalk(maxRepetitions, v.Name, rootOid)
 				if err != nil {
-					return
+					return nil, err
 				}
 				results = append(results, subResults...)
 			}
 		}
 	}
-	return
+	return results, nil
 }
 
 // Walk will SNMP walk the target, blocking until the process is complete
-func (x *GoSNMP) Walk(oid string) (results []SnmpPDU, err error) {
+func (c *Client) Walk(oid string) ([]SnmpPDU, error) {
 	if oid == "" {
 		return nil, fmt.Errorf("No OID given\n")
 	}
-	results = make([]SnmpPDU, 0)
+	results := make([]SnmpPDU, 0)
 	requestOid := oid
-
 	for {
-		res, err := x.GetNext(oid)
+		res, err := c.GetNext(oid)
 		if err != nil {
 			return results, err
 		}
-		if res != nil {
-			if len(res.Variables) > 0 {
-				if strings.Index(res.Variables[0].Name, requestOid) > -1 {
-					results = append(results, res.Variables[0])
-					// Set to the next
-					oid = res.Variables[0].Name
-					x.Log.Debug("Moving to %s\n", oid)
-				} else {
-					x.Log.Debug("Root OID mismatch, stopping walk\n")
-					break
-				}
-			} else {
-				break
-			}
-		} else {
+		if res == nil {
 			break
 		}
-
+		if len(res.Variables) <= 0 {
+			break
+		}
+		if strings.Index(res.Variables[0].Name, requestOid) <= -1 {
+			break
+		}
+		results = append(results, res.Variables[0])
+		// Set to the next
+		oid = res.Variables[0].Name
 	}
-	return
+	return results, nil
 }
 
 // sendPacket marshals & send an SNMP request. Unmarshals the response and
 // returns back the parsed SNMP packet
-func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
+func (c *Client) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 	// Set timeouts on the connection
 	deadline := time.Now()
-	x.conn.SetDeadline(deadline.Add(x.Timeout))
+	c.conn.SetDeadline(deadline.Add(c.Timeout))
 
 	// Create random Request-ID
 	packet.RequestID = rand.Uint32()
@@ -194,60 +170,57 @@ func (x *GoSNMP) sendPacket(packet *SnmpPacket) (*SnmpPacket, error) {
 	}
 
 	// Send the packet!
-	_, err = x.conn.Write(fBuf)
+	_, err = c.conn.Write(fBuf)
 	if err != nil {
-		return nil, fmt.Errorf("Error writing to socket: %s\n", err.Error())
+		return nil, fmt.Errorf("error writing to socket: %v", err)
 	}
 	// Try to read the response
 	resp := make([]byte, 8192, 8192)
-	n, err := x.conn.Read(resp)
-
+	n, err := c.conn.Read(resp)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading from UDP: %s\n", err.Error())
+		return nil, fmt.Errorf("error reading from UDP: %v", err)
 	}
 
 	// Unmarshal the read bytes
 	pdu, err := Unmarshal(resp[:n])
 
 	if err != nil {
-		return nil, fmt.Errorf("Unable to decode packet: %s\n", err.Error())
+		return nil, fmt.Errorf("unable to decode packet: %v", err)
 	}
 
 	if len(pdu.Variables) < 1 {
-		return nil, fmt.Errorf("No responses received.")
+		return nil, fmt.Errorf("no responses received")
 	}
 
 	// check Request-ID
 	if pdu.RequestID != packet.RequestID {
-		return nil, fmt.Errorf("Request ID mismatch")
+		return nil, fmt.Errorf("request ID mismatch")
 	}
-
 	return pdu, nil
 }
 
 // GetNext sends an SNMP Get Next Request to the target. Returns the next
 // variable response from the OID given or an error
-func (x *GoSNMP) GetNext(oid string) (*SnmpPacket, error) {
-	return x.request(GetNextRequest, oid)
+func (c *Client) GetNext(oid string) (*SnmpPacket, error) {
+	return c.request(GetNextRequest, oid)
 }
 
 // Debug function. Unmarshals raw bytes and returns the result without the network part
-func (x *GoSNMP) Debug(data []byte) (*SnmpPacket, error) {
+func (c *Client) Debug(data []byte) (*SnmpPacket, error) {
 	packet, err := Unmarshal(data)
-
 	if err != nil {
-		return nil, fmt.Errorf("Unable to decode packet: %s\n", err.Error())
+		return nil, fmt.Errorf("unable to decode packet: %v", err)
 	}
 	return packet, nil
 }
 
 // GetBulk sends an SNMP BULK-GET request to the target. Returns a Variable with
 // the response or an error
-func (x *GoSNMP) GetBulk(nonRepeaters, maxRepetitions uint8, oids ...string) (*SnmpPacket, error) {
+func (c *Client) GetBulk(nonRepeaters, maxRepetitions uint8, oids ...string) (*SnmpPacket, error) {
 	// Create and send the packet
-	return x.sendPacket(&SnmpPacket{
-		Version:        x.Version,
-		Community:      x.Community,
+	return c.sendPacket(&SnmpPacket{
+		Version:        c.Version,
+		Community:      c.Community,
 		RequestType:    GetBulkRequest,
 		NonRepeaters:   nonRepeaters,
 		MaxRepetitions: maxRepetitions,
@@ -257,21 +230,14 @@ func (x *GoSNMP) GetBulk(nonRepeaters, maxRepetitions uint8, oids ...string) (*S
 
 // Get sends an SNMP GET request to the target. Returns a Variable with the
 // response or an error
-func (x *GoSNMP) Get(oid string) (*SnmpPacket, error) {
-	return x.request(GetRequest, oid)
+func (c *Client) Get(oids ...string) (*SnmpPacket, error) {
+	return c.request(GetRequest, oids...)
 }
 
-// GetMulti sends an SNMP GET request to the target. Returns a Variable with the
-// response or an error
-func (x *GoSNMP) GetMulti(oids []string) (*SnmpPacket, error) {
-	return x.request(GetRequest, oids...)
-}
-
-func (x *GoSNMP) request(requestType Asn1BER, oids ...string) (*SnmpPacket, error) {
-	// Create and send the packet
-	return x.sendPacket(&SnmpPacket{
-		Version:     x.Version,
-		Community:   x.Community,
+func (c *Client) request(requestType Asn1BER, oids ...string) (*SnmpPacket, error) {
+	return c.sendPacket(&SnmpPacket{
+		Version:     c.Version,
+		Community:   c.Community,
 		RequestType: requestType,
 		Variables:   oidsToPbus(oids...),
 	})

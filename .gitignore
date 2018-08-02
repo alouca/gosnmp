@@ -22,6 +22,7 @@ _testmain.go
 *.exe
 
 # Editor Files
+.idea
 .*.sw*
 
 # Mac OS X crap
