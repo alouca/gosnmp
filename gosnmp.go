@@ -42,6 +42,11 @@ func NewClient(host, community string, version SnmpVersion, timeout int64) (*Cli
 	return s, nil
 }
 
+// Close closes the UDP client connection.
+func (c *Client) Close() error {
+	return c.conn.Close()
+}
+
 // SetTimeout sets the timeout for network read/write functions. Defaults to 5 seconds.
 func (c *Client) SetTimeout(seconds int64) {
 	if seconds <= 0 {
