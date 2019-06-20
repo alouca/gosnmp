@@ -143,7 +143,7 @@ func parseInt(bytes []byte) (int, error) {
 func Uvarint(buf []byte) (x uint64) {
 	for i, b := range buf {
 		x = x<<8 + uint64(b)
-		if i == 7 {
+		if i == 8 {
 			return
 		}
 	}
